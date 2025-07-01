@@ -72,6 +72,9 @@ class GameData {
             if (saved) {
                 const data = JSON.parse(saved);
                 this.playerData = { ...this.playerData, ...data.playerData };
+                
+                // Always reset players online count on startup since server connection is fresh
+                this.playerData.stats.playersOnline = 0;
             }
         } catch (error) {
             console.warn('Could not load saved data:', error);
@@ -116,6 +119,9 @@ class GameData {
                 this.connected = false;
                 this.mode = 'local';
                 
+                // Reset players online count when disconnected
+                this.updateStats({ playersOnline: 0 });
+                
                 // Notify UI about connection status change
                 this.notifySubscribers();
                 this.notifySubscribers('connectionStatus', { connected: false });
@@ -127,6 +133,9 @@ class GameData {
                 this.connected = false;
                 this.mode = 'local';
                 
+                // Reset players online count when connection fails
+                this.updateStats({ playersOnline: 0 });
+                
                 // Notify UI about connection status change
                 this.notifySubscribers();
                 this.notifySubscribers('connectionStatus', { connected: false, error: 'Connection failed' });
@@ -134,7 +143,15 @@ class GameData {
             
         } catch (error) {
             console.error('Failed to connect to server:', error);
+            this.connected = false;
             this.mode = 'local';
+            
+            // Reset players online count when connection fails
+            this.updateStats({ playersOnline: 0 });
+            
+            // Notify UI about connection status change
+            this.notifySubscribers();
+            throw error; // Re-throw so the caller knows connection failed
         }
     }
     
@@ -152,6 +169,10 @@ class GameData {
                 
             case 'playersList':
                 this.handlePlayersList(message.players);
+                break;
+                
+            case 'roomsUpdate':
+                this.handleRoomsUpdate(message.rooms);
                 break;
                 
             case 'gameInvite':
@@ -309,9 +330,22 @@ class GameData {
         }
     }
     
+    handleRoomsUpdate(rooms) {
+        console.log('Received rooms data from server:', rooms);
+        // Notify lobby scene about updated room data
+        if (this.roomsUpdateCallback) {
+            this.roomsUpdateCallback(rooms);
+        }
+    }
+    
     // Method for lobby to subscribe to players list updates
     onPlayersListUpdate(callback) {
         this.playersListCallback = callback;
+    }
+    
+    // Method for lobby to subscribe to room updates
+    onRoomsUpdate(callback) {
+        this.roomsUpdateCallback = callback;
     }
     
     // Request current players list from server
@@ -320,6 +354,16 @@ class GameData {
         if (this.connected) {
             this.sendToServer({
                 type: 'requestPlayersList'
+            });
+        }
+    }
+    
+    // Request current room data from server
+    requestRoomsData() {
+        console.log('Requesting rooms data from server...');
+        if (this.connected) {
+            this.sendToServer({
+                type: 'requestRoomsData'
             });
         }
     }

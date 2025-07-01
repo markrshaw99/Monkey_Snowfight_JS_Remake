@@ -20,21 +20,22 @@ class Lobby extends Scene {
         this.showRoomsDropdown = false;
         this.selectedRoom = 'Battlegrounds';
         this.dropdownScrollOffset = 0; // For scrolling through rooms
+        this.hoveredRoomIndex = -1; // Track which room is being hovered over
         this.rooms = [
             { name: 'Aggressive Apes', players: 0 },
             { name: 'Angry Aye-Aye', players: 0 },
             { name: 'Banana Split', players: 0 },
-            { name: 'Barking Bushbaby', players: 1 },
-            { name: 'Battlegrounds', players: 1 },
+            { name: 'Barking Bushbaby', players: 0 },
+            { name: 'Battlegrounds', players: 0 },
             { name: 'Biting Bonobo', players: 0 },
             { name: 'Chilly Chimp', players: 0 },
-            { name: 'Clearing', players: 1 },
+            { name: 'Clearing', players: 0 },
             { name: 'Cloud Forest', players: 0 },
             { name: 'Coconut Shy', players: 0 },
             { name: 'Cold Mountain', players: 0 },
-            { name: 'Crazy Capuchin', players: 2 },
+            { name: 'Crazy Capuchin', players: 0 },
             { name: 'Dancing Drill', players: 0 },
-            { name: 'Eager Orangutan', players: 1 }
+            { name: 'Eager Orangutan', players: 0 }
         ];
     }
 
@@ -51,10 +52,21 @@ class Lobby extends Scene {
             this.onlinePlayers = players;
         });
         
+        // Subscribe to room data updates
+        gameData.onRoomsUpdate((rooms) => {
+            console.log('Lobby received rooms update:', rooms);
+            this.updateRoomPlayerCounts(rooms);
+        });
+        
         // Subscribe to connection status changes
         gameData.subscribe((playerData) => {
             console.log('Lobby: Stats updated -', playerData.stats);
             this.statsData = playerData.stats;
+            
+            // Reset room player counts when server is offline
+            if (!gameData.connected) {
+                this.resetRoomPlayerCounts();
+            }
         });
         
         // Subscribe to game start events
@@ -75,8 +87,12 @@ class Lobby extends Scene {
             console.log('🌐 Lobby: Attempting to connect to server...');
             await gameData.connectToServer(); // Use auto-detected URL
             console.log('✅ Lobby: Online mode available');
+            
+            // TODO: Request room data from server when connected
+            // For now, rooms will show 0 players until server sends real data
         } catch (error) {
             console.log('Server unavailable, using local mode');
+            this.resetRoomPlayerCounts(); // Ensure rooms show 0 players when offline
         }
     }
 
@@ -158,9 +174,10 @@ class Lobby extends Scene {
             height: 20 * viewScale,
             onClick: () => {
                 this.showRoomsDropdown = !this.showRoomsDropdown;
-                // Reset scroll when opening
+                // Reset scroll and hover when opening
                 if (this.showRoomsDropdown) {
                     this.dropdownScrollOffset = 0;
+                    this.hoveredRoomIndex = -1;
                 }
             }
         };
@@ -600,7 +617,6 @@ class Lobby extends Scene {
         this.sceneManager.drawText(this.selectedRoom, 55 * viewScale, 177 * viewScale, {
             fontSize: 14 * viewScale,
             fontWeight: 'bold',
-            color: 'rgb(0, 0, 0)'
         });
         
         // Room dropdown button area
@@ -630,7 +646,6 @@ class Lobby extends Scene {
         
         this.sceneManager.drawText(displayText, dropdownX + 5 * viewScale, dropdownY + 3 * viewScale, {
             fontSize: 10 * viewScale,
-            color: 'rgb(0, 0, 0)'
         });
         
         // Dropdown arrow
@@ -681,8 +696,11 @@ class Lobby extends Scene {
             const room = this.rooms[roomIndex];
             const itemY = y + (i * itemHeight);
             
-            // Highlight selected room
-            if (room.name === this.selectedRoom) {
+            // Highlight selected room or hovered room
+            const isSelected = room.name === this.selectedRoom;
+            const isHovered = roomIndex === this.hoveredRoomIndex;
+            
+            if (isSelected || isHovered) {
                 this.sceneManager.drawPanel(
                     x + 1,
                     itemY,
@@ -698,7 +716,7 @@ class Lobby extends Scene {
             // Room name
             this.sceneManager.drawText(room.name, x + 5 * viewScale, itemY + 3 * viewScale, {
                 fontSize: 10 * viewScale,
-                color: room.name === this.selectedRoom ? 'rgb(0, 0, 100)' : 'rgb(0, 0, 0)'
+                color: (isSelected || isHovered) ? 'rgb(0, 0, 100)' : 'rgb(38, 87, 136)'
             });
             
             // Player count
@@ -952,6 +970,7 @@ class Lobby extends Scene {
             
             // Click outside dropdown to close it
             this.showRoomsDropdown = false;
+            this.hoveredRoomIndex = -1; // Clear hover when closing
             return;
         }
         
@@ -1011,6 +1030,31 @@ class Lobby extends Scene {
         }
     }
 
+    // Handle mouse movement for hover effects
+    handleMouseMove(x, y) {
+        // Only handle hover if dropdown is open
+        if (this.showRoomsDropdown && this.roomDropdownItems) {
+            let newHoveredIndex = -1;
+            
+            // Check which room item is being hovered
+            for (let i = 0; i < this.roomDropdownItems.length; i++) {
+                const item = this.roomDropdownItems[i];
+                if (this.isPointInButton(x, y, item)) {
+                    newHoveredIndex = i + this.dropdownScrollOffset;
+                    break;
+                }
+            }
+            
+            // Update hovered index if it changed
+            if (newHoveredIndex !== this.hoveredRoomIndex) {
+                this.hoveredRoomIndex = newHoveredIndex;
+            }
+        } else {
+            // Clear hover when dropdown is closed
+            this.hoveredRoomIndex = -1;
+        }
+    }
+
     // Helper methods to update stats (now using gameData)
     updateGamesWon(value) {
         gameData.updateStats({ gamesWon: parseInt(value) });
@@ -1036,6 +1080,25 @@ class Lobby extends Scene {
     // Update multiple stats at once
     updateStats(newStats) {
         gameData.updateStats(newStats);
+    }
+
+    // Update room player counts (called when server data is received)
+    updateRoomPlayerCounts(roomData) {
+        if (roomData && Array.isArray(roomData)) {
+            roomData.forEach(serverRoom => {
+                const localRoom = this.rooms.find(room => room.name === serverRoom.name);
+                if (localRoom) {
+                    localRoom.players = serverRoom.players;
+                }
+            });
+        }
+    }
+
+    // Reset all room player counts to 0 (called when server is offline)
+    resetRoomPlayerCounts() {
+        this.rooms.forEach(room => {
+            room.players = 0;
+        });
     }
 
     destroy() {

@@ -372,6 +372,17 @@ class SceneManager {
                 this.currentScene.handleWheel(x, y, event.deltaY);
             }
         });
+
+        // Add mouse move event handling for hover effects
+        this.canvas.addEventListener('mousemove', (event) => {
+            const rect = this.canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            
+            if (this.currentScene && this.currentScene.handleMouseMove) {
+                this.currentScene.handleMouseMove(x, y);
+            }
+        });
     }
 }
 
