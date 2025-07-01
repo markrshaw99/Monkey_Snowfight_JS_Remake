@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monkey Snow Fight JS Edition</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #1a1a1a;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <!-- Load config first -->
+    <script src="config.js"></script>
+    
+    <!-- Load vanilla scene manager -->
+    <script src="main.js"></script>
+    
+    <!-- Load scene files -->
+    <script src="Scenes/Lobby.js"></script>
+    <script src="Scenes/LocalGame.js"></script>
+    <script src="Scenes/OnlineMultiplayer.js"></script>
+    
+    <!-- Initialize the game -->
+    <script src="init.js"></script>
+</body>
+</html>
