@@ -97,6 +97,9 @@ class GameData {
                 this.connected = true;
                 this.mode = 'online';
                 
+                // Notify UI about connection status change
+                this.notifySubscribers();
+                
                 // Send player info to server
                 this.sendToServer({
                     type: 'playerJoin',
@@ -112,6 +115,9 @@ class GameData {
                 console.log('❌ Disconnected from server. Code:', event.code, 'Reason:', event.reason);
                 this.connected = false;
                 this.mode = 'local';
+                
+                // Notify UI about connection status change
+                this.notifySubscribers();
                 this.notifySubscribers('connectionStatus', { connected: false });
             };
             
@@ -120,6 +126,9 @@ class GameData {
                 console.error('❌ Failed to connect to:', wsUrl);
                 this.connected = false;
                 this.mode = 'local';
+                
+                // Notify UI about connection status change
+                this.notifySubscribers();
                 this.notifySubscribers('connectionStatus', { connected: false, error: 'Connection failed' });
             };
             

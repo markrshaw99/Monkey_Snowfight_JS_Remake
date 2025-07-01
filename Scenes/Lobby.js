@@ -30,6 +30,12 @@ class Lobby extends Scene {
             this.onlinePlayers = players;
         });
         
+        // Subscribe to connection status changes
+        gameData.subscribe((playerData) => {
+            console.log('Lobby: Stats updated -', playerData.stats);
+            this.statsData = playerData.stats;
+        });
+        
         // Subscribe to game start events
         gameData.onGameStart((opponent) => {
             console.log('Game starting! Opponent:', opponent);
@@ -45,8 +51,9 @@ class Lobby extends Scene {
 
     async tryConnectToServer() {
         try {
-            await gameData.connectToServer('ws://localhost:8080');
-            console.log('Online mode available');
+            console.log('🌐 Lobby: Attempting to connect to server...');
+            await gameData.connectToServer(); // Use auto-detected URL
+            console.log('✅ Lobby: Online mode available');
         } catch (error) {
             console.log('Server unavailable, using local mode');
         }
