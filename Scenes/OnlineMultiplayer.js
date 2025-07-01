@@ -1,38 +1,52 @@
-// Online Multiplayer Scene
+// Canvas-based Online Multiplayer Scene
 class OnlineMultiplayer extends Scene {
-    create() {
-        // Add background
-        this.sceneManager.createBackground('images/background.svg');
+    async create() {
+        // Load background image
+        await this.sceneManager.loadImage('images/Background.svg');
         
-        // Add logos (from parent class)
-        super.create();
+        // Set up back button for click handling
+        this.setupButtons();
+    }
 
-        // Add title
-        this.sceneManager.createText(
+    setupButtons() {
+        this.buttons = [
+            {
+                x: (gameWidth * viewScale / 2) - 75,
+                y: (gameHeight * viewScale / 2) + 80,
+                width: 150,
+                height: 40,
+                text: "Back to Lobby",
+                onClick: () => this.sceneManager.startScene('lobby')
+            }
+        ];
+    }
+
+    render(ctx) {
+        // Draw background
+        this.sceneManager.drawBackground('images/Background.svg');
+        
+        // Draw title
+        this.sceneManager.drawText(
             'Online Multiplayer Mode',
             gameWidth * viewScale / 2,
             gameHeight * viewScale / 2,
             {
-                fontSize: '32px',
+                fontSize: 32 * viewScale,
                 color: '#ffffff',
-                stroke: true
+                textAlign: 'center',
+                textBaseline: 'middle'
             }
         );
 
-        // Add back button
-        this.sceneManager.createText(
-            'Back to Lobby',
-            gameWidth * viewScale / 2,
-            gameHeight * viewScale / 2 + 100,
-            {
-                fontSize: '18px',
-                color: '#FF9800',
-                stroke: true,
-                interactive: true,
-                onClick: () => {
-                    gameManager.startScene('lobby');
-                }
-            }
-        );
+        // Draw buttons
+        for (let button of this.buttons) {
+            this.sceneManager.drawButton(
+                button.text,
+                button.x,
+                button.y,
+                button.width,
+                button.height
+            );
+        }
     }
 }

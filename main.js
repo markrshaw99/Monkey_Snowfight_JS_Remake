@@ -1,26 +1,55 @@
-// Simple Scene Manager for Monkey Snow Fight
+// Canvas-based Scene Manager for Monkey Snow Fight
 class SceneManager {
     constructor() {
         this.currentScene = null;
         this.scenes = {};
-        this.gameContainer = null;
+        this.canvas = null;
+        this.ctx = null;
+        this.images = {}; // Cache for loaded images
+        this.fontsLoaded = false;
         this.init();
         this.loadCustomFonts(); // Load fonts when SceneManager is created
     }
 
     init() {
-        // Create game container
-        this.gameContainer = document.createElement('div');
-        this.gameContainer.id = 'game-container';
-        this.gameContainer.style.cssText = `
-            position: relative;
-            width: ${gameWidth * viewScale}px;
-            height: ${gameHeight * viewScale}px;
-            margin: 0 auto;
-            background: #2c3e50;
-            overflow: hidden;
-        `;
-        document.body.appendChild(this.gameContainer);
+        // Get canvas element and set size
+        this.canvas = document.getElementById('gameCanvas');
+        this.canvas.width = gameWidth * viewScale;
+        this.canvas.height = gameHeight * viewScale;
+        
+        this.ctx = this.canvas.getContext('2d');
+        
+        // Set up canvas for crisp pixel art
+        this.ctx.imageSmoothingEnabled = false;
+        this.ctx.webkitImageSmoothingEnabled = false;
+        this.ctx.mozImageSmoothingEnabled = false;
+        this.ctx.msImageSmoothingEnabled = false;
+        
+        // Set up click handling
+        this.setupClickHandling();
+        
+        // Start render loop
+        this.startRenderLoop();
+    }
+
+    startRenderLoop() {
+        const render = () => {
+            // Update game logic
+            if (this.currentScene && this.currentScene.update) {
+                this.currentScene.update();
+            }
+            
+            // Clear canvas
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            
+            // Draw current scene if it exists
+            if (this.currentScene && this.currentScene.render) {
+                this.currentScene.render(this.ctx);
+            }
+            
+            requestAnimationFrame(render);
+        };
+        render();
     }
 
     registerScene(name, sceneClass) {
@@ -28,8 +57,10 @@ class SceneManager {
     }
 
     startScene(name, data = {}) {
-        // Clear container
-        this.gameContainer.innerHTML = '';
+        // Clean up current scene
+        if (this.currentScene && this.currentScene.destroy) {
+            this.currentScene.destroy();
+        }
 
         // Start new scene
         if (this.scenes[name]) {
@@ -38,78 +69,51 @@ class SceneManager {
         }
     }
 
-    createImage(imagePath, x, y, width, height) {
-        const imgElement = document.createElement('img');
-        imgElement.src = imagePath;
-        imgElement.style.cssText = `
-            position: absolute;
-            left: ${x}px;
-            top: ${y}px;
-            width: ${width}px;
-            height: ${height}px;
-            z-index: 5;
-        `;
-        this.gameContainer.appendChild(imgElement);
-        return imgElement;
+    // Load and cache images
+    async loadImage(imagePath) {
+        if (this.images[imagePath]) {
+            return this.images[imagePath];
+        }
+
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+                this.images[imagePath] = img;
+                resolve(img);
+            };
+            img.onerror = reject;
+            img.src = imagePath;
+        });
     }
 
-    createImageCentered(imagePath, x, y, width, height) {
-        const imgElement = document.createElement('img');
-        imgElement.src = imagePath;
-        imgElement.style.cssText = `
-            position: absolute;
-            left: ${x}px;
-            top: ${y}px;
-            width: ${width}px;
-            height: ${height}px;
-            transform: translate(-50%, 0%);
-            z-index: 5;
-        `;
-        this.gameContainer.appendChild(imgElement);
-        return imgElement;
+    // Canvas drawing methods
+    drawImage(imagePath, x, y, width, height) {
+        const img = this.images[imagePath];
+        if (img) {
+            this.ctx.drawImage(img, x, y, width, height);
+        }
     }
 
-    createBackground(imagePath) {
-        const bgElement = document.createElement('div');
-        bgElement.style.cssText = `
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 0;
-        `;
+    drawImageCentered(imagePath, x, y, width, height) {
+        const img = this.images[imagePath];
+        if (img) {
+            this.ctx.drawImage(img, x - width/2, y, width, height);
+        }
+    }
+
+    drawBackground(imagePath) {
+        const img = this.images[imagePath];
+        if (img) {
+            this.canvas.style.shapeRendering = 'crispEdges';
+            this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
+        }
+    }
+
+    // Canvas-based Snowfall system using original game assets and exact Flash logic
+    async createSnowfall() {
+        // Load snowflake image first
+        await this.loadImage('images/snowflake_1.png');
         
-        // Load SVG content and insert inline
-        fetch(imagePath)
-            .then(response => response.text())
-            .then(svgContent => {
-                bgElement.innerHTML = svgContent;
-                const svgElement = bgElement.querySelector('svg');
-                if (svgElement) {
-                    // Configure SVG for proper scaling
-                    svgElement.removeAttribute('width');
-                    svgElement.removeAttribute('height');
-                    svgElement.style.cssText = `
-                        width: 100%;
-                        height: 100%;
-                        shape-rendering: crispEdges;
-                    `;
-                    
-                    svgElement.setAttribute('viewBox', '0 0 612.15 412.1');
-                    svgElement.setAttribute('preserveAspectRatio', 'none');
-                }
-            })
-            .catch(error => {
-                console.error('Error loading SVG:', error);
-            });
-
-        this.gameContainer.appendChild(bgElement);
-        return bgElement;
-    }
-
-    // Snowfall system using original game assets and exact Flash logic
-    createSnowfall() {
         // Original Flash parameters from frame_37/PlaceObject2_567_259
         this.snowFlakes = 5;
         this.stageWidth = 600;
@@ -124,37 +128,16 @@ class SceneManager {
         for (let i = 0; i < this.snowFlakes; i++) {
             this.createFlake(i);
         }
-        
-        // Start animation loop
-        this.animateSnowfall();
     }
 
     createFlake(i) {
         // Original Flash makeFlake function logic
-        const snowflake = document.createElement('img');
-        snowflake.src = 'images/snowflake_1.png'; // Using frame 1 as base
-        
-        // Random starting position and properties (matching Flash logic)
         const x = Math.random() * this.stageWidth;
         const y = Math.random() * (this.stageHeight * 2) - (this.stageHeight * 2);
         const size = Math.random() * 50 + 50; // 50-100%
         
-        snowflake.style.cssText = `
-            position: absolute;
-            left: ${x * viewScale}px;
-            top: ${y * viewScale}px;
-            width: ${(size/100) * 20 * viewScale}px;
-            height: ${(size/100) * 20 * viewScale}px;
-            z-index: 1;
-            pointer-events: none;
-            opacity: 0.8;
-        `;
-        
-        this.gameContainer.appendChild(snowflake);
-        
         // Store snowflake data with Flash properties
         const flakeData = {
-            element: snowflake,
             x: x,
             y: y,
             size: size,
@@ -167,7 +150,7 @@ class SceneManager {
         this.snowfallArray[i] = flakeData;
     }
 
-    animateSnowfall() {
+    updateSnowfall() {
         if (!this.snowfallActive) return;
         
         // Original Flash frame_3 animation logic - CORRECTED
@@ -186,10 +169,6 @@ class SceneManager {
             flake.y += flake.fallSpeed;            // Vertical position - steady fall
             flake.vin += flake.snowSpeed;          // Increment sine wave counter
             
-            // Update DOM element position
-            flake.element.style.left = (flake.x * viewScale) + 'px';
-            flake.element.style.top = (flake.y * viewScale) + 'px';
-            
             // Reset flake if it falls off screen
             if (flake.y > this.stageHeight + 10) {
                 // Reset using makeFlake logic
@@ -200,135 +179,149 @@ class SceneManager {
                 flake.vin = flake.x + Math.random() * 10 - 5;
                 flake.snowSpeed = this.snowSpeed * ((Math.random() * 100 - 50) / 80);
                 flake.fallSpeed = Math.random() * (this.snowSpeed * 15) + 1;
-                
-                // Update size
-                const newSize = (flake.size/100) * 20 * viewScale;
-                flake.element.style.width = newSize + 'px';
-                flake.element.style.height = newSize + 'px';
             }
         }
+    }
+
+    renderSnowfall() {
+        if (!this.snowfallActive || !this.snowfallArray) return;
         
-        // Continue animation (equivalent to Flash's gotoAndPlay)
-        requestAnimationFrame(() => this.animateSnowfall());
+        const snowImg = this.images['images/snowflake_1.png'];
+        if (!snowImg) return;
+        
+        this.ctx.globalAlpha = 0.8;
+        
+        for (let i = 0; i < this.snowFlakes; i++) {
+            const flake = this.snowfallArray[i];
+            if (!flake) continue;
+            
+            const size = (flake.size/100) * 20 * viewScale;
+            this.ctx.drawImage(
+                snowImg,
+                flake.x * viewScale - size/2,
+                flake.y * viewScale - size/2,
+                size,
+                size
+            );
+        }
+        
+        this.ctx.globalAlpha = 1.0;
     }
 
     stopSnowfall() {
         this.snowfallActive = false;
-        
-        // Remove all snowflakes
-        if (this.snowfallArray) {
-            this.snowfallArray.forEach(flake => {
-                if (flake && flake.element) {
-                    flake.element.remove();
-                }
-            });
-            this.snowfallArray = [];
-        }
+        this.snowfallArray = [];
     }
 
-    createButton(text, x, y, width, height, onClick, style = {}) {
-        const button = document.createElement('button');
-        button.textContent = text;
-        
+    // Canvas drawing methods for UI elements
+    drawButton(text, x, y, width, height, style = {}) {
         const defaultStyle = {
             backgroundColor: '#FF6B35',
             color: 'white',
-            border: '2px solid #FF8C42',
-            borderRadius: '8px',
-            fontSize: '16px',
+            borderColor: '#FF8C42',
+            borderWidth: 2,
+            borderRadius: 8,
+            fontSize: 16,
             fontWeight: 'bold',
-            cursor: 'pointer',
             fontFamily: 'Arial, sans-serif',
             ...style
         };
         
-        button.style.cssText = `
-            position: absolute;
-            left: ${x}px;
-            top: ${y}px;
-            width: ${width}px;
-            height: ${height}px;
-            background-color: ${defaultStyle.backgroundColor};
-            color: ${defaultStyle.color};
-            border: ${defaultStyle.border};
-            border-radius: ${defaultStyle.borderRadius};
-            font-size: ${defaultStyle.fontSize};
-            font-weight: ${defaultStyle.fontWeight};
-            cursor: ${defaultStyle.cursor};
-            font-family: ${defaultStyle.fontFamily};
-            z-index: 10;
-            transition: all 0.2s ease;
-        `;
+        // Draw button background
+        this.ctx.fillStyle = defaultStyle.backgroundColor;
+        this.drawRoundedRect(x, y, width, height, defaultStyle.borderRadius);
+        this.ctx.fill();
         
-        // Hover effects
-        button.addEventListener('mouseenter', () => {
-            button.style.backgroundColor = '#FF8C42';
-            button.style.transform = 'scale(1.05)';
-        });
+        // Draw button border
+        this.ctx.strokeStyle = defaultStyle.borderColor;
+        this.ctx.lineWidth = defaultStyle.borderWidth;
+        this.drawRoundedRect(x, y, width, height, defaultStyle.borderRadius);
+        this.ctx.stroke();
         
-        button.addEventListener('mouseleave', () => {
-            button.style.backgroundColor = defaultStyle.backgroundColor;
-            button.style.transform = 'scale(1.0)';
-        });
+        // Draw button text
+        this.ctx.fillStyle = defaultStyle.color;
+        this.ctx.font = `${defaultStyle.fontWeight} ${defaultStyle.fontSize}px ${defaultStyle.fontFamily}`;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText(text, x + width/2, y + height/2);
         
-        button.addEventListener('click', onClick);
-        
-        this.gameContainer.appendChild(button);
-        return button;
+        return { x, y, width, height }; // Return bounds for click detection
     }
 
-    createPanel(x, y, width, height, style = {}) {
-        const panel = document.createElement('div');
-        
+    drawPanel(x, y, width, height, style = {}) {
         const defaultStyle = {
+            backgroundColor: 'rgb(255, 255, 255)',
+            borderColor: 'rgb(175, 220, 230)',
+            borderWidth: 4,
+            borderRadius: 12,
+            insetBorder: false,
+            insetColors: ['rgb(255, 255, 255)', 'rgb(175, 220, 230)'],
+            insetWidths: [4, 7],
             ...style
         };
         
-        panel.style.cssText = `
-            position: absolute;
-            left: ${x}px;
-            top: ${y}px;
-            width: ${width}px;
-            height: ${height}px;
-            background-color: ${defaultStyle.backgroundColor};
-            border: ${defaultStyle.border};
-            border-radius: ${defaultStyle.borderRadius};
-            box-shadow: ${defaultStyle.boxShadow};
-            z-index: 3;
-        `;
+        // Draw panel background
+        this.ctx.fillStyle = defaultStyle.backgroundColor;
+        this.drawRoundedRect(x, y, width, height, defaultStyle.borderRadius);
+        this.ctx.fill();
         
-        this.gameContainer.appendChild(panel);
-        return panel;
+        // Draw inset borders if specified
+        if (defaultStyle.insetBorder && defaultStyle.insetColors && defaultStyle.insetWidths) {
+            for (let i = defaultStyle.insetColors.length - 1; i >= 0; i--) {
+                const insetWidth = defaultStyle.insetWidths[i];
+                const insetColor = defaultStyle.insetColors[i];
+                
+                this.ctx.strokeStyle = insetColor;
+                this.ctx.lineWidth = insetWidth;
+                this.drawRoundedRect(
+                    x + (insetWidth / 2), 
+                    y + (insetWidth / 2), 
+                    width - insetWidth, 
+                    height - insetWidth, 
+                    defaultStyle.borderRadius
+                );
+                this.ctx.stroke();
+            }
+        } else if (defaultStyle.borderWidth > 0) {
+            // Draw regular border
+            this.ctx.strokeStyle = defaultStyle.borderColor;
+            this.ctx.lineWidth = defaultStyle.borderWidth;
+            this.drawRoundedRect(x, y, width, height, defaultStyle.borderRadius);
+            this.ctx.stroke();
+        }
     }
 
-    createText(text, x, y, style = {}) {
-        const textElement = document.createElement('div');
-        textElement.textContent = text;
-        
+    drawText(text, x, y, style = {}) {
         const defaultStyle = {
-            color: 'rgb(38, 87, 136)', // Dark slate gray
-            fontSize: '18px',
-            fontWeight: 'bold',
-            fontFamily: "'Trade Gothic Bold', sans-serif", // Corrected font name and added fallback
+            color: 'rgb(38, 87, 136)',
+            fontSize: 10,
+            fontFamily: "'Trade Gothic Bold', sans-serif",
+            fontWeight: 'normal',
             textAlign: 'left',
+            textBaseline: 'top',
             ...style
         };
         
-        textElement.style.cssText = `
-            position: absolute;
-            left: ${x}px;
-            top: ${y}px;
-            color: ${defaultStyle.color}; // Use the variable, not a hardcoded string
-            font-size: ${defaultStyle.fontSize};
-            font-weight: ${defaultStyle.fontWeight};
-            font-family: ${defaultStyle.fontFamily};
-            text-align: ${defaultStyle.textAlign};
-            z-index: 5;
-            pointer-events: none;
-        `;
-        
-        this.gameContainer.appendChild(textElement);
-        return textElement;
+        this.ctx.fillStyle = defaultStyle.color;
+        this.ctx.font = `${defaultStyle.fontWeight} ${defaultStyle.fontSize}px ${defaultStyle.fontFamily}`;
+        this.ctx.textAlign = defaultStyle.textAlign;
+        this.ctx.textBaseline = defaultStyle.textBaseline;
+        this.ctx.fillText(text, x, y);
+    }
+
+    // Helper method to draw rounded rectangles
+    drawRoundedRect(x, y, width, height, radius) {
+        this.ctx.beginPath();
+        this.ctx.moveTo(x + radius, y);
+        this.ctx.lineTo(x + width - radius, y);
+        this.ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        this.ctx.lineTo(x + width, y + height - radius);
+        this.ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        this.ctx.lineTo(x + radius, y + height);
+        this.ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        this.ctx.lineTo(x, y + radius);
+        this.ctx.quadraticCurveTo(x, y, x + radius, y);
+        this.ctx.closePath();
     }
 
     // Load custom fonts from assets
@@ -340,27 +333,76 @@ class SceneManager {
             { name: 'VAG Rounded', file: 'assets/Fonts/79_VAGRounded BT.ttf' }
         ];
 
-        fontFaces.forEach(font => {
+        const fontPromises = fontFaces.map(font => {
             const fontFace = new FontFace(font.name, `url("${font.file}")`);
-            fontFace.load().then(loadedFont => {
+            return fontFace.load().then(loadedFont => {
                 document.fonts.add(loadedFont);
                 console.log(`Font ${font.name} loaded successfully`);
+                return loadedFont;
             }).catch(error => {
                 console.error(`Failed to load font ${font.name}:`, error);
             });
         });
+
+        Promise.all(fontPromises).then(() => {
+            this.fontsLoaded = true;
+        });
+    }
+
+    // Add click handling for canvas
+    setupClickHandling() {
+        this.canvas.addEventListener('click', (event) => {
+            const rect = this.canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            
+            if (this.currentScene && this.currentScene.handleClick) {
+                this.currentScene.handleClick(x, y);
+            }
+        });
     }
 }
 
-// Base Scene class
+// Base Scene class for canvas rendering
 class Scene {
     constructor(sceneManager, data = {}) {
         this.sceneManager = sceneManager;
         this.data = data;
+        this.buttons = []; // Store button bounds for click detection
     }
 
     create() {
         // Override in subclasses
+    }
+
+    render(ctx) {
+        // Override in subclasses
+        // This is called every frame to draw the scene
+    }
+
+    update() {
+        // Override in subclasses for game logic updates
+        if (this.sceneManager.snowfallActive) {
+            this.sceneManager.updateSnowfall();
+        }
+    }
+
+    handleClick(x, y) {
+        // Override in subclasses for click handling
+        // Check if click is within any button bounds
+        for (let button of this.buttons) {
+            if (x >= button.x && x <= button.x + button.width &&
+                y >= button.y && y <= button.y + button.height) {
+                if (button.onClick) {
+                    button.onClick();
+                }
+            }
+        }
+    }
+
+    destroy() {
+        // Override in subclasses for cleanup
+        this.buttons = [];
     }
 }
 
