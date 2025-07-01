@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Monkey Snowfight Connection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .debug-panel {
+            background: #2c3e50;
+            border: 1px solid #34495e;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 10px 0;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background: #27ae60; }
+        .error { background: #e74c3c; }
+        .warning { background: #f39c12; }
+        .info { background: #3498db; }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #2980b9; }
+        #logs {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>🐒 Monkey Snowfight - Connection Debug</h1>
+    
+    <div class="debug-panel">
+        <h2>🌐 Environment Info</h2>
+        <div id="envInfo"></div>
+    </div>
+    
+    <div class="debug-panel">
+        <h2>🔌 Connection Test</h2>
+        <button onclick="testConnection()">Test WebSocket Connection</button>
+        <button onclick="clearLogs()">Clear Logs</button>
+        <div id="connectionStatus"></div>
+    </div>
+    
+    <div class="debug-panel">
+        <h2>📋 Console Logs</h2>
+        <div id="logs"></div>
+    </div>
+
+    <!-- Load game data for testing -->
+    <script src="config.js"></script>
+    <script src="gameData.js"></script>
+
+    <script>
+        // Capture console logs
+        const logsDiv = document.getElementById('logs');
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+
+        function addLog(type, ...args) {
+            const timestamp = new Date().toLocaleTimeString();
+            const message = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+            ).join(' ');
+            logsDiv.textContent += `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+
+        console.log = (...args) => {
+            originalLog(...args);
+            addLog('log', ...args);
+        };
+
+        console.error = (...args) => {
+            originalError(...args);
+            addLog('error', ...args);
+        };
+
+        console.warn = (...args) => {
+            originalWarn(...args);
+            addLog('warn', ...args);
+        };
+
+        // Display environment info
+        function showEnvInfo() {
+            const envInfo = document.getElementById('envInfo');
+            envInfo.innerHTML = `
+                <p><strong>Current URL:</strong> ${window.location.href}</p>
+                <p><strong>Protocol:</strong> ${window.location.protocol}</p>
+                <p><strong>Host:</strong> ${window.location.host}</p>
+                <p><strong>Detected WebSocket URL:</strong> <span id="wsUrl">Loading...</span></p>
+                <p><strong>Browser:</strong> ${navigator.userAgent}</p>
+            `;
+        }
+
+        // Test connection
+        async function testConnection() {
+            const statusDiv = document.getElementById('connectionStatus');
+            statusDiv.innerHTML = '<div class="status info">🔄 Testing connection...</div>';
+            
+            console.log('=== Starting Connection Test ===');
+            
+            try {
+                // Create gameData instance if not exists
+                if (typeof gameData === 'undefined') {
+                    window.gameData = new GameData();
+                }
+                
+                document.getElementById('wsUrl').textContent = gameData.SERVER_URL;
+                
+                // Try to connect
+                await gameData.connectToServer();
+                
+                // Wait a bit for connection
+                setTimeout(() => {
+                    if (gameData.connected) {
+                        statusDiv.innerHTML = '<div class="status success">✅ Connection successful!</div>';
+                    } else {
+                        statusDiv.innerHTML = '<div class="status error">❌ Connection failed - check logs above</div>';
+                    }
+                }, 2000);
+                
+            } catch (error) {
+                console.error('Connection test failed:', error);
+                statusDiv.innerHTML = '<div class="status error">❌ Connection test failed: ' + error.message + '</div>';
+            }
+        }
+
+        function clearLogs() {
+            logsDiv.textContent = '';
+        }
+
+        // Initialize
+        showEnvInfo();
+        console.log('🚀 Debug page loaded');
+        
+        // Auto-test on page load
+        setTimeout(() => {
+            console.log('🔍 Auto-testing connection...');
+            testConnection();
+        }, 1000);
+    </script>
+</body>
+</html>

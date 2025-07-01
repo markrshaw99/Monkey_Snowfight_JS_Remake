@@ -7,6 +7,7 @@ class GameData {
         
         // Server configuration - automatically detects the right URL
         this.SERVER_URL = this.getServerURL();
+        console.log('🎯 Detected server URL:', this.SERVER_URL);
         
         this.playerData = {
             profile: {
@@ -46,11 +47,14 @@ class GameData {
         
         // If we're on localhost, use the standard port
         if (host.includes('localhost') || host.includes('127.0.0.1')) {
+            console.log('🏠 Using localhost WebSocket');
             return 'ws://localhost:8080';
         }
         
         // For deployed versions, use the same host
-        return `${protocol}//${host}`;
+        const wsUrl = `${protocol}//${host}`;
+        console.log('🌐 Using deployed WebSocket:', wsUrl);
+        return wsUrl;
     }
     
     // === LOCAL STORAGE ===
@@ -77,6 +81,7 @@ class GameData {
     // === ONLINE CONNECTION ===
     async connectToServer(serverUrl = null) {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            console.log('🔗 Already connected to server');
             return; // Already connected
         }
         
@@ -84,11 +89,11 @@ class GameData {
         const wsUrl = serverUrl || this.SERVER_URL;
         
         try {
-            console.log('Connecting to server:', wsUrl);
+            console.log('🔌 Attempting to connect to server:', wsUrl);
             this.socket = new WebSocket(wsUrl);
             
             this.socket.onopen = () => {
-                console.log('Connected to game server');
+                console.log('✅ Connected to game server successfully!');
                 this.connected = true;
                 this.mode = 'online';
                 
@@ -103,15 +108,19 @@ class GameData {
                 this.handleServerMessage(JSON.parse(event.data));
             };
             
-            this.socket.onclose = () => {
-                console.log('Disconnected from server');
+            this.socket.onclose = (event) => {
+                console.log('❌ Disconnected from server. Code:', event.code, 'Reason:', event.reason);
                 this.connected = false;
                 this.mode = 'local';
+                this.notifySubscribers('connectionStatus', { connected: false });
             };
             
             this.socket.onerror = (error) => {
-                console.error('WebSocket error:', error);
+                console.error('❌ WebSocket error:', error);
+                console.error('❌ Failed to connect to:', wsUrl);
+                this.connected = false;
                 this.mode = 'local';
+                this.notifySubscribers('connectionStatus', { connected: false, error: 'Connection failed' });
             };
             
         } catch (error) {
