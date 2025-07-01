@@ -360,6 +360,18 @@ class SceneManager {
                 this.currentScene.handleClick(x, y);
             }
         });
+
+        // Add wheel event handling for scrolling
+        this.canvas.addEventListener('wheel', (event) => {
+            const rect = this.canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            
+            if (this.currentScene && this.currentScene.handleWheel) {
+                event.preventDefault(); // Prevent page scrolling
+                this.currentScene.handleWheel(x, y, event.deltaY);
+            }
+        });
     }
 }
 

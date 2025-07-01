@@ -15,6 +15,27 @@ class Lobby extends Scene {
         // Online players list
         this.onlinePlayers = [];
         this.showPlayersList = false;
+        
+        // Room selection dropdown
+        this.showRoomsDropdown = false;
+        this.selectedRoom = 'Battlegrounds';
+        this.dropdownScrollOffset = 0; // For scrolling through rooms
+        this.rooms = [
+            { name: 'Aggressive Apes', players: 0 },
+            { name: 'Angry Aye-Aye', players: 0 },
+            { name: 'Banana Split', players: 0 },
+            { name: 'Barking Bushbaby', players: 1 },
+            { name: 'Battlegrounds', players: 1 },
+            { name: 'Biting Bonobo', players: 0 },
+            { name: 'Chilly Chimp', players: 0 },
+            { name: 'Clearing', players: 1 },
+            { name: 'Cloud Forest', players: 0 },
+            { name: 'Coconut Shy', players: 0 },
+            { name: 'Cold Mountain', players: 0 },
+            { name: 'Crazy Capuchin', players: 2 },
+            { name: 'Dancing Drill', players: 0 },
+            { name: 'Eager Orangutan', players: 1 }
+        ];
     }
 
     async create() {
@@ -128,6 +149,21 @@ class Lobby extends Scene {
                 }
             }
         ];
+        
+        // Room selection dropdown button
+        this.roomDropdownButton = {
+            x: 245 * viewScale,  // Match dropdown area exactly
+            y: 174 * viewScale,
+            width: 170 * viewScale,
+            height: 20 * viewScale,
+            onClick: () => {
+                this.showRoomsDropdown = !this.showRoomsDropdown;
+                // Reset scroll when opening
+                if (this.showRoomsDropdown) {
+                    this.dropdownScrollOffset = 0;
+                }
+            }
+        };
     }
 
     showOnlineOptions() {
@@ -340,6 +376,46 @@ class Lobby extends Scene {
                 borderRadius: 12,
             }
         );
+
+                this.sceneManager.drawPanel(
+            45 * viewScale,
+            165 * viewScale,
+            377 * viewScale,
+            40 * viewScale,
+            { 
+                backgroundColor: 'rgb(255, 255, 255)',
+                borderRadius: 12,
+                insetColor:  'rgb(175, 220, 230)',
+                borderWidth: '4'
+            }
+        );
+        
+                this.sceneManager.drawPanel(
+            428 * viewScale,
+            165 * viewScale,
+            127 * viewScale,
+            214 * viewScale,
+            { 
+                backgroundColor: 'rgb(255, 255, 255)',
+                borderRadius: 12,
+                insetColor:  'rgb(175, 220, 230)',
+                borderWidth: '4'
+            }
+        );
+
+                        this.sceneManager.drawPanel(
+            45 * viewScale,
+            339 * viewScale,
+            377 * viewScale,
+            40 * viewScale,
+            { 
+                backgroundColor: 'rgb(255, 255, 255)',
+                borderRadius: 12,
+                insetColor:  'rgb(175, 220, 230)',
+                borderWidth: '4'
+            }
+        );
+
         // Sub Panels End
 
         //Sub Sub Panels
@@ -432,7 +508,7 @@ class Lobby extends Scene {
             color: 'rgb(0, 0, 0)',
         });
 
-        this.sceneManager.drawText(this.statsData.rating, 390 * viewScale, 105 * viewScale, {
+        this.sceneManager.drawText(this.statsData.rating, 380 * viewScale, 105 * viewScale, {
             fontSize: 11 * viewScale,
             color: 'rgb(0, 0, 0)',
         });
@@ -483,6 +559,9 @@ class Lobby extends Scene {
             3 * viewScale
         );
         // Monkey Face End
+        
+        // Room Selection UI
+        this.drawRoomSelection();
     }
 
     drawButtons() {
@@ -514,6 +593,225 @@ class Lobby extends Scene {
             40 * viewScale,
             { backgroundColor: '#3b82f6', borderColor: '#2563eb' }
         );
+    }
+
+    drawRoomSelection() {
+        // Current room title (dynamically shows selected room)
+        this.sceneManager.drawText(this.selectedRoom, 55 * viewScale, 177 * viewScale, {
+            fontSize: 14 * viewScale,
+            fontWeight: 'bold',
+            color: 'rgb(0, 0, 0)'
+        });
+        
+        // Room dropdown button area
+        const dropdownX = 245 * viewScale;
+        const dropdownY = 174 * viewScale;
+        const dropdownWidth = 170 * viewScale;
+        const dropdownHeight = 20 * viewScale;
+        
+        // Dropdown button background
+        this.sceneManager.drawPanel(
+            dropdownX,
+            dropdownY,
+            dropdownWidth,
+            dropdownHeight,
+            { 
+                backgroundColor: 'rgb(255, 255, 255)',
+                borderRadius: 4,
+                insetBorder: true,
+                insetColors: ['rgb(200, 200, 200)', 'rgb(240, 240, 240)'],
+                insetWidths: [1, 2]
+            }
+        );
+        
+        // Current selection text - show selected room name and player count
+        const currentRoom = this.rooms.find(room => room.name === this.selectedRoom);
+        const displayText = currentRoom ? `${currentRoom.name} (${currentRoom.players} players)` : 'Select a room';
+        
+        this.sceneManager.drawText(displayText, dropdownX + 5 * viewScale, dropdownY + 3 * viewScale, {
+            fontSize: 10 * viewScale,
+            color: 'rgb(0, 0, 0)'
+        });
+        
+        // Dropdown arrow
+        this.sceneManager.drawText('▼', dropdownX + dropdownWidth - 15 * viewScale, dropdownY + 3 * viewScale, {
+            fontSize: 10 * viewScale,
+            color: 'rgb(100, 100, 100)'
+        });
+        
+        // Show dropdown list if open
+        if (this.showRoomsDropdown) {
+            this.drawRoomsDropdown(dropdownX, dropdownY + dropdownHeight);
+        }
+    }
+
+    drawRoomsDropdown(x, y) {
+        const dropdownWidth = 170 * viewScale;
+        const itemHeight = 18 * viewScale;
+        const maxVisibleItems = 6; // Reduced to make scrolling more apparent
+        const totalItems = this.rooms.length;
+        const visibleItems = Math.min(totalItems, maxVisibleItems);
+        const dropdownHeight = visibleItems * itemHeight;
+        
+        // Calculate scroll bounds
+        const maxScrollOffset = Math.max(0, totalItems - maxVisibleItems);
+        this.dropdownScrollOffset = Math.max(0, Math.min(this.dropdownScrollOffset, maxScrollOffset));
+        
+        // Dropdown background
+        this.sceneManager.drawPanel(
+            x,
+            y,
+            dropdownWidth,
+            dropdownHeight,
+            { 
+                backgroundColor: 'rgb(255, 255, 255)',
+                borderRadius: 4,
+                insetBorder: true,
+                insetColors: ['rgb(150, 150, 150)', 'rgb(255, 255, 255)'],
+                insetWidths: [1, 1]
+            }
+        );
+        
+        // Room items
+        this.roomDropdownItems = [];
+        for (let i = 0; i < visibleItems; i++) {
+            const roomIndex = i + this.dropdownScrollOffset;
+            if (roomIndex >= totalItems) break;
+            
+            const room = this.rooms[roomIndex];
+            const itemY = y + (i * itemHeight);
+            
+            // Highlight selected room
+            if (room.name === this.selectedRoom) {
+                this.sceneManager.drawPanel(
+                    x + 1,
+                    itemY,
+                    dropdownWidth - 2,
+                    itemHeight,
+                    { 
+                        backgroundColor: 'rgb(200, 230, 255)',
+                        borderRadius: 0
+                    }
+                );
+            }
+            
+            // Room name
+            this.sceneManager.drawText(room.name, x + 5 * viewScale, itemY + 3 * viewScale, {
+                fontSize: 10 * viewScale,
+                color: room.name === this.selectedRoom ? 'rgb(0, 0, 100)' : 'rgb(0, 0, 0)'
+            });
+            
+            // Player count
+            this.sceneManager.drawText(`(${room.players})`, x + dropdownWidth - 25 * viewScale, itemY + 3 * viewScale, {
+                fontSize: 10 * viewScale,
+                color: 'rgb(100, 100, 100)'
+            });
+            
+            // Store clickable area
+            this.roomDropdownItems.push({
+                x: x,
+                y: itemY,
+                width: dropdownWidth,
+                height: itemHeight,
+                room: room,
+                onClick: () => {
+                    console.log('Room clicked:', room.name, 'Previous:', this.selectedRoom);
+                    this.selectedRoom = room.name;
+                    this.showRoomsDropdown = false;
+                    this.dropdownScrollOffset = 0; // Reset scroll when selection changes
+                    console.log('Selected room changed to:', this.selectedRoom);
+                    
+                    // Here you can add future functionality like:
+                    // - Join the room on the server
+                    // - Update player counts
+                    // - Filter online players by room
+                }
+            });
+        }
+        
+        // Draw scroll indicators if needed
+        if (totalItems > maxVisibleItems) {
+            const scrollbarWidth = 8 * viewScale;
+            const scrollbarX = x + dropdownWidth - scrollbarWidth - 2 * viewScale;
+            const scrollUpY = y - 12 * viewScale;
+            const scrollDownY = y + dropdownHeight + 4 * viewScale;
+            
+            // Scroll track
+            this.sceneManager.drawPanel(
+                scrollbarX,
+                y + 2 * viewScale,
+                scrollbarWidth,
+                dropdownHeight - 4 * viewScale,
+                { 
+                    backgroundColor: 'rgb(230, 230, 230)',
+                    borderRadius: 2
+                }
+            );
+            
+            // Scroll thumb
+            const thumbHeight = Math.max(20 * viewScale, (dropdownHeight * maxVisibleItems) / totalItems);
+            const thumbY = y + 2 * viewScale + ((dropdownHeight - 4 * viewScale - thumbHeight) * this.dropdownScrollOffset) / maxScrollOffset;
+            
+            this.sceneManager.drawPanel(
+                scrollbarX + 1 * viewScale,
+                thumbY,
+                scrollbarWidth - 2 * viewScale,
+                thumbHeight,
+                { 
+                    backgroundColor: 'rgb(150, 150, 150)',
+                    borderRadius: 2
+                }
+            );
+            
+            // Scroll arrows with clickable areas
+            this.sceneManager.drawText('▲', scrollbarX, scrollUpY, {
+                fontSize: 8 * viewScale,
+                color: this.dropdownScrollOffset > 0 ? 'rgb(100, 100, 100)' : 'rgb(200, 200, 200)'
+            });
+            
+            this.sceneManager.drawText('▼', scrollbarX, scrollDownY, {
+                fontSize: 8 * viewScale,
+                color: this.dropdownScrollOffset < maxScrollOffset ? 'rgb(100, 100, 100)' : 'rgb(200, 200, 200)'
+            });
+            
+            // Store scroll arrow clickable areas
+            this.scrollUpButton = {
+                x: scrollbarX - 2 * viewScale,
+                y: scrollUpY - 2 * viewScale,
+                width: 12 * viewScale,
+                height: 12 * viewScale,
+                onClick: () => {
+                    if (this.dropdownScrollOffset > 0) {
+                        this.dropdownScrollOffset--;
+                    }
+                }
+            };
+            
+            this.scrollDownButton = {
+                x: scrollbarX - 2 * viewScale,
+                y: scrollDownY - 2 * viewScale,
+                width: 12 * viewScale,
+                height: 12 * viewScale,
+                onClick: () => {
+                    if (this.dropdownScrollOffset < maxScrollOffset) {
+                        this.dropdownScrollOffset++;
+                    }
+                }
+            };
+        } else {
+            // Clear scroll buttons if not needed
+            this.scrollUpButton = null;
+            this.scrollDownButton = null;
+        }
+        
+        // Store dropdown bounds for scroll detection
+        this.dropdownBounds = {
+            x: x,
+            y: y,
+            width: dropdownWidth,
+            height: dropdownHeight,
+            maxScrollOffset: maxScrollOffset
+        };
     }
 
     drawPlayersList() {
@@ -630,7 +928,40 @@ class Lobby extends Scene {
 
     // Override handleClick to handle players list interactions
     handleClick(x, y) {
-        // Check players list buttons first
+        // Check room dropdown first
+        if (this.showRoomsDropdown) {
+            // Check scroll arrows first
+            if (this.scrollUpButton && this.isPointInButton(x, y, this.scrollUpButton)) {
+                this.scrollUpButton.onClick();
+                return;
+            }
+            if (this.scrollDownButton && this.isPointInButton(x, y, this.scrollDownButton)) {
+                this.scrollDownButton.onClick();
+                return;
+            }
+            
+            // Check dropdown items
+            if (this.roomDropdownItems) {
+                for (let item of this.roomDropdownItems) {
+                    if (this.isPointInButton(x, y, item)) {
+                        item.onClick();
+                        return;
+                    }
+                }
+            }
+            
+            // Click outside dropdown to close it
+            this.showRoomsDropdown = false;
+            return;
+        }
+        
+        // Check room dropdown button
+        if (this.roomDropdownButton && this.isPointInButton(x, y, this.roomDropdownButton)) {
+            this.roomDropdownButton.onClick();
+            return;
+        }
+        
+        // Check players list buttons
         if (this.showPlayersList) {
             // Check close button
             if (this.closeButton && this.isPointInButton(x, y, this.closeButton)) {
@@ -658,6 +989,26 @@ class Lobby extends Scene {
                x <= button.x + button.width && 
                y >= button.y && 
                y <= button.y + button.height;
+    }
+
+    // Handle wheel scrolling for dropdown
+    handleWheel(x, y, deltaY) {
+        // Only handle wheel events if dropdown is open and mouse is over dropdown area
+        if (this.showRoomsDropdown && this.dropdownBounds) {
+            const isOverDropdown = x >= this.dropdownBounds.x && 
+                                 x <= this.dropdownBounds.x + this.dropdownBounds.width &&
+                                 y >= this.dropdownBounds.y && 
+                                 y <= this.dropdownBounds.y + this.dropdownBounds.height;
+            
+            if (isOverDropdown) {
+                // Scroll up/down based on wheel direction
+                const scrollDirection = deltaY > 0 ? 1 : -1;
+                const newScrollOffset = this.dropdownScrollOffset + scrollDirection;
+                
+                // Clamp to bounds
+                this.dropdownScrollOffset = Math.max(0, Math.min(newScrollOffset, this.dropdownBounds.maxScrollOffset));
+            }
+        }
     }
 
     // Helper methods to update stats (now using gameData)
