@@ -1052,6 +1052,9 @@ class Lobby extends Scene {
             return;
         }
         
+        // Get chat messages safely
+        const chatMessages = gameData.roomData?.chatMessages || [];
+        
         // Chat messages area
         let yOffset = 35; // Adjusted for debug line
         const maxMessages = 11; // Reduced by 1 for debug line

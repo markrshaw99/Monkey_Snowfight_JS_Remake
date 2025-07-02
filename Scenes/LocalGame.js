@@ -15,6 +15,21 @@ class LocalGame extends Scene {
         this.START_ANGLE = 45;
         this.FIRE_PAUSE = 2500; // ms between shots
         
+        // Game state
+        this.players = [];
+        this.currentPlayer = 0;
+        this.snowballs = [];
+        this.canFire = true;
+        this.lastFireTime = 0;
+        
+        // UI elements for controls
+        this.angleSlider = null;
+        this.loadButton = null;
+        this.fireButton = null;
+        this.isDraggingAngle = false;
+        this.isBuildingPower = false;
+        this.powerBuildStart = 0;
+        
         // Input state
         this.mouseX = 0;
         this.mouseY = 0;
