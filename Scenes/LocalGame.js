@@ -1,52 +1,137 @@
-// Canvas-based Local Game Scene
+// Core Monkey Snowfight Game Implementation
+// Based on original Flash ActionScript code analysis
+
 class LocalGame extends Scene {
-    async create() {
+    constructor(sceneManager, data = {}) {
+        super(sceneManager, data);
+        this.name = 'LocalGame';
+        this.gameState = 'ready'; // 'ready', 'playing', 'gameOver'
+        
+        // Core physics constants from original Flash ActionScript
+        this.GRAVITY = 1.3;
+        this.DRAG = 0.9;
+        this.HIT_TEST_ITERATIONS = 11;
+        this.POWER_BOOST = 1.5;
+        this.START_ANGLE = 45;
+        this.FIRE_PAUSE = 2500; // ms between shots
+        
+        // Input state
+        this.mouseX = 0;
+        this.mouseY = 0;
+        this.keys = {};
+        
+        console.log('LocalGame scene constructed - ready for implementation');
+    }
+
+    onEnter() {
+        console.log('Entered LocalGame scene');
         // Load background image
-        await this.sceneManager.loadImage('images/Background.svg');
-        
-        // Set up back button for click handling
-        this.setupButtons();
+        this.loadBackground();
     }
 
-    setupButtons() {
-        this.buttons = [
-            {
-                x: (gameWidth * viewScale / 2) - 75,
-                y: (gameHeight * viewScale / 2) + 80,
-                width: 150,
-                height: 40,
-                text: "Back to Lobby",
-                onClick: () => this.sceneManager.startScene('lobby')
-            }
-        ];
-    }
-
-    render(ctx) {
-        // Draw background
-        this.sceneManager.drawBackground('images/Background.svg');
-        
-        // Draw title
-        this.sceneManager.drawText(
-            'Local Game Mode',
-            gameWidth * viewScale / 2,
-            gameHeight * viewScale / 2,
-            {
-                fontSize: 32 * viewScale,
-                color: '#ffffff',
-                textAlign: 'center',
-                textBaseline: 'middle'
-            }
-        );
-
-        // Draw buttons
-        for (let button of this.buttons) {
-            this.sceneManager.drawButton(
-                button.text,
-                button.x,
-                button.y,
-                button.width,
-                button.height
-            );
+    async loadBackground() {
+        try {
+            await this.sceneManager.loadImage('images/Background2.svg');
+            console.log('Background loaded for LocalGame');
+        } catch (error) {
+            console.error('Failed to load background:', error);
         }
+    }
+
+    onExit() {
+        console.log('Exited LocalGame scene');
+        // Clean up any resources when leaving the scene
+    }
+
+    update(deltaTime) {
+        // Main game update loop - implement your game logic here
+        this.handleInput();
+    }
+
+    render(ctx, canvas) {
+        // Clear the screen
+        const viewScale = Math.min(canvas.width / 600, canvas.height / 400);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw background (same as Lobby)
+        this.sceneManager.drawBackground('images/Background2.svg');
+        
+        // Your rendering code goes here
+        this.renderUI(ctx, canvas, viewScale);
+    }
+
+    renderUI(ctx, canvas, viewScale) {
+        // Basic UI elements
+        ctx.fillStyle = '#000000';
+        ctx.font = `${Math.floor(24 * viewScale)}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.fillText('Local Game Mode', canvas.width / 2, 50 * viewScale);
+        
+        ctx.font = `${Math.floor(16 * viewScale)}px Arial`;
+        ctx.fillText('Ready for implementation!', canvas.width / 2, 80 * viewScale);
+        
+        // Back button
+        const buttonWidth = 100 * viewScale;
+        const buttonHeight = 30 * viewScale;
+        const buttonX = canvas.width - buttonWidth - 10 * viewScale;
+        const buttonY = 10 * viewScale;
+        
+        ctx.fillStyle = '#FF6B6B';
+        ctx.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
+        
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = `${Math.floor(14 * viewScale)}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.fillText('Back', buttonX + buttonWidth / 2, buttonY + buttonHeight / 2 + 5 * viewScale);
+    }
+
+    handleInput() {
+        // Handle continuous input like movement
+    }
+
+    handleMouseMove(mouseX, mouseY) {
+        this.mouseX = mouseX;
+        this.mouseY = mouseY;
+    }
+
+    handleMouseDown(mouseX, mouseY, canvas, viewScale) {
+        // Handle mouse clicks
+        console.log('LocalGame handleMouseDown called:', mouseX, mouseY);
+        
+        if (!canvas) {
+            canvas = document.getElementById('gameCanvas');
+        }
+        if (!viewScale) {
+            viewScale = Math.min(canvas.width / 600, canvas.height / 400);
+        }
+        
+        // Back button
+        const buttonWidth = 100 * viewScale;
+        const buttonHeight = 30 * viewScale;
+        const buttonX = canvas.width - buttonWidth - 10 * viewScale;
+        const buttonY = 10 * viewScale;
+        
+        console.log('Button area:', buttonX, buttonY, buttonWidth, buttonHeight);
+        console.log('Mouse coords:', mouseX, mouseY);
+        
+        if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth &&
+            mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
+            console.log('Back button clicked! Switching to lobby...');
+            this.sceneManager.startScene('lobby');
+        }
+    }
+
+    handleMouseUp(mouseX, mouseY) {
+        // Handle mouse release
+    }
+
+    handleKeyDown(key) {
+        this.keys[key] = true;
+        // Handle key presses
+    }
+
+    handleKeyUp(key) {
+        this.keys[key] = false;
+        // Handle key releases
     }
 }

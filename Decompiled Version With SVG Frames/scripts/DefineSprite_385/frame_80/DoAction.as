@@ -1,0 +1,9 @@
+if(!_parent.monkeyIsDown)
+{
+   gotoAndStop("idle");
+}
+else
+{
+   gotoAndStop("hit");
+   play();
+}

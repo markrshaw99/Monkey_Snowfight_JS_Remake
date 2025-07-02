@@ -1,0 +1,1 @@
+monkeyDownDelay = getTimer() + msDisabled;

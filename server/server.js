@@ -6,8 +6,9 @@ const path = require('path');
 
 class GameServer {
     constructor() {
-        this.players = new Map(); // playerId -> { ws, playerInfo }
+        this.players = new Map(); // playerId -> { ws, playerInfo, room }
         this.games = new Map();   // gameId -> { player1, player2, gameState }
+        this.rooms = new Map();   // roomName -> Set of playerIds
         this.playersOnline = 0;
         
         // Create Express app to serve game files
@@ -50,7 +51,7 @@ class GameServer {
     }
     
     handleMessage(ws, message) {
-        console.log('Server received message:', message.type);
+        // New player connected
         switch (message.type) {
             case 'playerJoin':
                 this.handlePlayerJoin(ws, message.player);
@@ -58,6 +59,14 @@ class GameServer {
                 
             case 'requestPlayersList':
                 this.handlePlayersListRequest(ws);
+                break;
+                
+            case 'joinRoom':
+                this.handleJoinRoom(ws, message.roomName);
+                break;
+                
+            case 'requestRoomsData':
+                this.handleRoomsDataRequest(ws);
                 break;
                 
             case 'gameRequest':
@@ -68,12 +77,20 @@ class GameServer {
                 this.handleGameInviteResponse(ws, message);
                 break;
                 
+            case 'requestRoomPlayers':
+                this.handleRoomPlayersRequest(ws, message.roomName);
+                break;
+                
+            case 'roomChatMessage':
+                this.handleRoomChatMessage(ws, message);
+                break;
+                
             case 'gameMove':
                 this.handleGameMove(ws, message);
                 break;
                 
             default:
-                console.log('Unknown message type:', message.type);
+                // Unknown message type
         }
     }
     
@@ -81,12 +98,13 @@ class GameServer {
         // Store player info
         this.players.set(playerInfo.id, {
             ws: ws,
-            playerInfo: playerInfo
+            playerInfo: playerInfo,
+            room: null // Player starts without a room
         });
         
         // Update online count
         this.playersOnline = this.players.size;
-        console.log(`Player ${playerInfo.name} joined. Players online: ${this.playersOnline}`);
+        // Player joined
         
         // Broadcast updated player count to all players
         this.broadcastToAll({
@@ -114,7 +132,7 @@ class GameServer {
             return;
         }
         
-        console.log(`Game request from ${requestingPlayer.playerInfo.name} to ${targetPlayer.playerInfo.name}`);
+        // Game request sent
         
         // Send invitation to target player
         targetPlayer.ws.send(JSON.stringify({
@@ -152,20 +170,130 @@ class GameServer {
         }
     }
     
+    handleJoinRoom(ws, roomName) {
+        const player = this.getPlayerByWs(ws);
+        if (!player) return;
+        
+        // Remove player from their current room (if any)
+        if (player.room) {
+            const currentRoom = this.rooms.get(player.room);
+            if (currentRoom) {
+                currentRoom.delete(player.playerInfo.id);
+                if (currentRoom.size === 0) {
+                    this.rooms.delete(player.room);
+                }
+            }
+        }
+        
+        // Add player to new room
+        if (!this.rooms.has(roomName)) {
+            this.rooms.set(roomName, new Set());
+        }
+        this.rooms.get(roomName).add(player.playerInfo.id);
+        player.room = roomName;
+        
+        // Player joined room
+        
+        // Broadcast updated room data to all players
+        this.broadcastRoomData();
+        
+        // Send confirmation to the player
+        ws.send(JSON.stringify({
+            type: 'roomJoined',
+            roomName: roomName
+        }));
+    }
+    
+    handleRoomsDataRequest(ws) {
+        this.sendRoomData(ws);
+    }
+    
+    sendRoomData(ws) {
+        const roomsData = {};
+        for (const [roomName, playerIds] of this.rooms) {
+            roomsData[roomName] = playerIds.size;
+        }
+        
+        ws.send(JSON.stringify({
+            type: 'roomsData',
+            rooms: roomsData
+        }));
+    }
+    
+    broadcastRoomData() {
+        const roomsData = {};
+        for (const [roomName, playerIds] of this.rooms) {
+            roomsData[roomName] = playerIds.size;
+        }
+        
+        this.broadcastToAll({
+            type: 'roomsData',
+            rooms: roomsData
+        });
+    }
+
+    handleRoomChatMessage(ws, message) {
+        const player = this.getPlayerByWs(ws);
+        if (!player || !player.room) {
+            // Cannot send chat: player not found or not in room
+            return;
+        }
+        
+        // Room chat message
+        
+        const chatMessage = {
+            type: 'roomChatMessage',
+            roomName: player.room,
+            playerId: player.playerInfo.id,
+            playerName: player.playerInfo.name,
+            message: message.text,
+            timestamp: new Date().toISOString()
+        };
+        
+        // Send message to all players in the same room
+        const room = this.rooms.get(player.room);
+        if (room) {
+            let messagesSent = 0;
+            for (const playerId of room) {
+                const playerData = this.players.get(playerId);
+                if (playerData && playerData.ws.readyState === WebSocket.OPEN) {
+                    playerData.ws.send(JSON.stringify(chatMessage));
+                    messagesSent++;
+                }
+            }
+            // Chat message sent to room players
+        } else {
+            // Room not found for chat message
+        }
+    }
+
     handlePlayerDisconnect(ws) {
         const player = this.getPlayerByWs(ws);
         if (player) {
-            console.log(`Player ${player.playerInfo.name} disconnected`);
+            // Player disconnected
+            
+            // Remove player from their room (if any)
+            if (player.room) {
+                const room = this.rooms.get(player.room);
+                if (room) {
+                    room.delete(player.playerInfo.id);
+                    if (room.size === 0) {
+                        this.rooms.delete(player.room);
+                    }
+                }
+            }
+            
             this.players.delete(player.playerInfo.id);
             
             // Update online count
             this.playersOnline = this.players.size;
             
-            // Broadcast updated player count
+            // Broadcast updated player count and room data
             this.broadcastToAll({
                 type: 'playersOnlineUpdate',
                 count: this.playersOnline
             });
+            this.broadcastRoomData();
             
             // End any games this player was in
             this.endPlayerGames(player.playerInfo.id);
@@ -206,19 +334,19 @@ class GameServer {
                 }
                 
                 this.games.delete(gameId);
-                console.log(`Game ${gameId} ended due to player disconnect`);
+                // Game ended due to player disconnect
             }
         }
     }
     
     handlePlayersListRequest(ws) {
-        console.log('Server: Players list requested');
+        // Players list requested
         const playersList = Array.from(this.players.values()).map(p => ({
             id: p.playerInfo.id,
             name: p.playerInfo.name
         }));
         
-        console.log('Server: Sending players list:', playersList);
+        // Sending players list
         
         ws.send(JSON.stringify({
             type: 'playersList',
@@ -231,7 +359,7 @@ class GameServer {
         const requestingPlayer = this.players.get(message.fromPlayerId);
         
         if (!respondingPlayer || !requestingPlayer) {
-            console.log('Player not found for invite response');
+            // Player not found for invite response
             return;
         }
         
@@ -267,7 +395,7 @@ class GameServer {
                 opponent: requestingPlayer.playerInfo
             }));
             
-            console.log(`Game ${gameId} started between ${requestingPlayer.playerInfo.name} and ${respondingPlayer.playerInfo.name}`);
+            // Game started between players
         } else {
             // Notify requesting player that invite was declined
             requestingPlayer.ws.send(JSON.stringify({
@@ -275,7 +403,7 @@ class GameServer {
                 playerName: respondingPlayer.playerInfo.name
             }));
             
-            console.log(`${respondingPlayer.playerInfo.name} declined invite from ${requestingPlayer.playerInfo.name}`);
+            // Game invite declined
         }
     }
     

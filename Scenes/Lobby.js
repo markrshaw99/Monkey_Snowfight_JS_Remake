@@ -16,6 +16,13 @@ class Lobby extends Scene {
         this.onlinePlayers = [];
         this.showPlayersList = false;
         
+        // Room-based features
+        this.roomPlayers = []; // Players in the current room
+        this.showRoomChat = false;
+        this.chatMessages = [];
+        this.chatInput = '';
+        this.chatScrollOffset = 0;
+        
         // Room selection dropdown
         this.showRoomsDropdown = false;
         this.selectedRoom = 'Battlegrounds';
@@ -33,9 +40,45 @@ class Lobby extends Scene {
             { name: 'Cloud Forest', players: 0 },
             { name: 'Coconut Shy', players: 0 },
             { name: 'Cold Mountain', players: 0 },
-            { name: 'Crazy Capuchin', players: 0 },
-            { name: 'Dancing Drill', players: 0 },
-            { name: 'Eager Orangutan', players: 0 }
+            { name: 'Crazy Monkeys', players: 0 },
+            { name: 'Crystal Lake', players: 0 },
+            { name: 'Flinging Lemur', players: 0 },
+            { name: 'Frosty Hills', players: 0 },
+            { name: 'Frustrated Guenon', players: 0 },
+            { name: 'Gibbon Hut', players: 0 },
+            { name: 'Great Grivet', players: 0 },
+            { name: 'Growling Gelada', players: 0 },
+            { name: 'Guenon', players: 0 },
+            { name: 'Guereza', players: 0 },
+            { name: 'Heat-up Howler', players: 0 },
+            { name: 'Ice Palace', players: 0 },
+            { name: 'Icicle Village', players: 0 },
+            { name: 'Jigokudani', players: 0 },
+            { name: 'Jungle', players: 0 },
+            { name: 'Lander Woods', players: 0 },
+            { name: 'Leary Lar', players: 0 },
+            { name: 'Lions Den', players: 0 },
+            { name: 'Mad Colobus', players: 0 },
+            { name: 'Madagascar', players: 0 },
+            { name: 'Mangrove', players: 0 },
+            { name: 'Mighty Uakari', players: 0 },
+            { name: 'Monkey Carnage', players: 0 },
+            { name: 'Nana Tree', players: 0 },
+            { name: 'Oasis', players: 0 },
+            { name: 'Orabazu Ordeal', players: 0 },
+            { name: 'Perturbed Potto', players: 0 },
+            { name: 'Playpen', players: 0 },
+            { name: 'Pressured Potto', players: 0 },
+            { name: 'Ranomafana', players: 0 },
+            { name: 'Sanctuary', players: 0 },
+            { name: 'Shaking Sifaka', players: 0 },
+            { name: 'Sharp Shooters', players: 0 },
+            { name: 'Tanga', players: 0 },
+            { name: 'The Manor', players: 0 },
+            { name: 'Treetops', players: 0 },
+            { name: 'Waterhole', players: 0 },
+            { name: 'Yakushima', players: 0 },
+            { name: 'Yunnan', players: 0 }
         ];
     }
 
@@ -48,19 +91,38 @@ class Lobby extends Scene {
         
         // Subscribe to players list updates
         gameData.onPlayersListUpdate((players) => {
-            console.log('Lobby received players list update:', players);
+            // Players list updated
             this.onlinePlayers = players;
         });
         
         // Subscribe to room data updates
         gameData.onRoomsUpdate((rooms) => {
-            console.log('Lobby received rooms update:', rooms);
+            // Rooms list updated
             this.updateRoomPlayerCounts(rooms);
+        });
+        
+        // Subscribe to room joined confirmations
+        gameData.onRoomJoined((roomName) => {
+            // Successfully joined room
+            // The selectedRoom should already be set from the UI click
+        });
+        
+        // Subscribe to room players updates
+        gameData.onRoomPlayersUpdate((roomName, players) => {
+            // Room players updated
+            if (roomName === this.selectedRoom) {
+                this.roomPlayers = players;
+            }
+        });
+        
+        // Subscribe to room chat messages
+        gameData.onRoomChatMessage((message) => {
+            // Messages are stored in gameData.roomData.chatMessages automatically
         });
         
         // Subscribe to connection status changes
         gameData.subscribe((playerData) => {
-            console.log('Lobby: Stats updated -', playerData.stats);
+            // Stats updated
             this.statsData = playerData.stats;
             
             // Reset room player counts when server is offline
@@ -71,7 +133,7 @@ class Lobby extends Scene {
         
         // Subscribe to game start events
         gameData.onGameStart((opponent) => {
-            console.log('Game starting! Opponent:', opponent);
+            // Game starting with opponent
             this.sceneManager.startScene('onlineMultiplayer');
         });
         
@@ -88,8 +150,12 @@ class Lobby extends Scene {
             await gameData.connectToServer(); // Use auto-detected URL
             console.log('✅ Lobby: Online mode available');
             
-            // TODO: Request room data from server when connected
-            // For now, rooms will show 0 players until server sends real data
+            // Request initial room data and players list from server
+            gameData.requestRoomsData();
+            gameData.requestPlayersList();
+            
+            // Auto-join the currently selected room
+            gameData.joinRoom(this.selectedRoom);
         } catch (error) {
             console.log('Server unavailable, using local mode');
             this.resetRoomPlayerCounts(); // Ensure rooms show 0 players when offline
@@ -98,7 +164,7 @@ class Lobby extends Scene {
 
     async loadImages() {
         const imagePaths = [
-            'images/Background.svg',
+            'images/Background2.svg',
             'images/Miniclip.svg',
             'images/Title.svg',
             'images/LobbyTemplate.png',
@@ -124,43 +190,60 @@ class Lobby extends Scene {
         // Add button configurations for click detection
         this.buttons = [
             {
-                x: 80 * viewScale,
-                y: 260 * viewScale,
-                width: 120 * viewScale,
-                height: 40 * viewScale,
+                x: 50 * viewScale,
+                y: 345 * viewScale,
+                width: 60 * viewScale,
+                height: 30 * viewScale,
                 text: "Local Game",
                 onClick: () => {
+                    // Transitioning to Local Game
                     gameData.startLocalGame();
                     this.sceneManager.startScene('localGame');
                 }
             },
             {
-                x: 220 * viewScale,
-                y: 260 * viewScale,
-                width: 120 * viewScale,
-                height: 40 * viewScale,
+                x: 120 * viewScale,
+                y: 345 * viewScale,
+                width: 60 * viewScale,
+                height: 30 * viewScale,
                 text: "Practice",
                 onClick: () => {
+                    // Practice mode (single player)
                     gameData.startLocalGame();
-                    console.log('Starting practice mode...');
                 }
             },
             {
-                x: 360 * viewScale,
-                y: 260 * viewScale,
-                width: 120 * viewScale,
-                height: 40 * viewScale,
+                x: 190 * viewScale,
+                y: 345 * viewScale,
+                width: 60 * viewScale,
+                height: 30 * viewScale,
                 text: gameData.connected ? "Find Players" : "Server Offline",
                 onClick: () => {
-                    console.log('Find Players button clicked. Connected:', gameData.connected);
+                    // Toggle players list
                     if (gameData.connected) {
-                        console.log('Toggling players list. Current state:', this.showPlayersList);
+                        // Toggle players list visibility
                         this.showPlayersList = !this.showPlayersList;
                         if (this.showPlayersList) {
                             gameData.requestPlayersList();
                         }
                     } else {
-                        console.log('Server not available');
+                        // Server not available for multiplayer
+                    }
+                }
+            },
+            // Room Players button
+            {
+                x: 50 * viewScale,
+                y: 200 * viewScale,
+                width: 80 * viewScale,
+                height: 25 * viewScale,
+                text: gameData.connected ? "Room Players" : "Offline",
+                onClick: () => {
+                    if (gameData.connected) {
+                        this.showPlayersList = !this.showPlayersList;
+                        if (this.showPlayersList) {
+                            gameData.requestRoomPlayers(this.selectedRoom);
+                        }
                     }
                 }
             }
@@ -194,20 +277,30 @@ class Lobby extends Scene {
         }
     }
 
+    handleKeyDown(key) {
+        // Always handle chat input when connected to server
+        if (gameData.connected) {
+            if (key === 'Enter') {
+                this.sendChatMessage();
+            } else if (key === 'Backspace') {
+                this.chatInput = this.chatInput.slice(0, -1);
+            } else if (key.length === 1 && this.chatInput.length < 50) {
+                // Add regular characters (not special keys)
+                this.chatInput += key;
+            }
+        }
+    }
+    
     challengePlayer(playerId, playerName) {
-        console.log(`Challenging player ${playerName} (${playerId})`);
-        const success = gameData.startOnlineGame(playerId);
-        if (success) {
-            console.log('Challenge sent successfully');
-            // Don't immediately start scene - wait for game to actually start
-        } else {
-            console.log('Failed to send challenge');
+        // Challenging a player
+        if (gameData.connected) {
+            gameData.startOnlineGame(playerId);
         }
     }
 
-    render(ctx) {
+    async render(ctx) {
         // Draw background
-        this.sceneManager.drawBackground('images/Background.svg');
+        this.sceneManager.drawBackground('images/Background2.svg');
         
         // Draw snowfall
         this.sceneManager.renderSnowfall();
@@ -419,6 +512,9 @@ class Lobby extends Scene {
                 borderWidth: '4'
             }
         );
+        
+        // Draw permanent chat in the right panel
+        this.drawPermanentChat();
 
                         this.sceneManager.drawPanel(
             45 * viewScale,
@@ -585,18 +681,18 @@ class Lobby extends Scene {
         // Game mode buttons
         this.sceneManager.drawButton(
             'Local Game',
-            80 * viewScale,
-            260 * viewScale,
-            120 * viewScale,
-            40 * viewScale
+            50 * viewScale,
+            345 * viewScale,
+            60 * viewScale,
+            30 * viewScale
         );
         
         this.sceneManager.drawButton(
             'Practice',
-            220 * viewScale,
-            260 * viewScale,
             120 * viewScale,
-            40 * viewScale,
+            345 * viewScale,
+            60 * viewScale,
+            30 * viewScale,
             { backgroundColor: '#10b981', borderColor: '#059669' }
         );
         
@@ -604,11 +700,26 @@ class Lobby extends Scene {
         const thirdButtonText = gameData.connected ? "Find Players" : "Server Offline";
         this.sceneManager.drawButton(
             thirdButtonText,
-            360 * viewScale,
-            260 * viewScale,
-            120 * viewScale,
-            40 * viewScale,
+            190 * viewScale,
+            345 * viewScale,
+            60 * viewScale,
+            30 * viewScale,
             { backgroundColor: '#3b82f6', borderColor: '#2563eb' }
+        );
+        
+        // Room-based feature buttons
+        const roomPlayersText = gameData.connected ? "Room Players" : "Offline";
+        this.sceneManager.drawButton(
+            roomPlayersText,
+            260 * viewScale,
+            345 * viewScale,
+            50 * viewScale,
+            30 * viewScale,
+            { 
+                backgroundColor: this.showPlayersList ? '#059669' : '#10b981', 
+                borderColor: '#047857',
+                fontSize: 12 * viewScale
+            }
         );
     }
 
@@ -663,7 +774,7 @@ class Lobby extends Scene {
     drawRoomsDropdown(x, y) {
         const dropdownWidth = 170 * viewScale;
         const itemHeight = 18 * viewScale;
-        const maxVisibleItems = 6; // Reduced to make scrolling more apparent
+        const maxVisibleItems = 8; // Reduced to make scrolling more apparent
         const totalItems = this.rooms.length;
         const visibleItems = Math.min(totalItems, maxVisibleItems);
         const dropdownHeight = visibleItems * itemHeight;
@@ -733,16 +844,16 @@ class Lobby extends Scene {
                 height: itemHeight,
                 room: room,
                 onClick: () => {
-                    console.log('Room clicked:', room.name, 'Previous:', this.selectedRoom);
+                    // Room selected
                     this.selectedRoom = room.name;
                     this.showRoomsDropdown = false;
                     this.dropdownScrollOffset = 0; // Reset scroll when selection changes
-                    console.log('Selected room changed to:', this.selectedRoom);
+                    // Update selected room
                     
-                    // Here you can add future functionality like:
-                    // - Join the room on the server
-                    // - Update player counts
-                    // - Filter online players by room
+                    // Join the room on the server if connected
+                    if (gameData.connected) {
+                        gameData.joinRoom(room.name);
+                    }
                 }
             });
         }
@@ -854,8 +965,8 @@ class Lobby extends Scene {
         );
         
         // Title
-        this.sceneManager.drawText('Online Players', panelX + 10 * viewScale, panelY + 10 * viewScale, {
-            fontSize: 14 * viewScale,
+        this.sceneManager.drawText(`Players in ${this.selectedRoom}`, panelX + 10 * viewScale, panelY + 10 * viewScale, {
+            fontSize: 12 * viewScale,
             fontWeight: 'bold'
         });
         
@@ -865,84 +976,182 @@ class Lobby extends Scene {
             color: 'rgb(0, 120, 0)'
         });
         
-        // Other players
-        const otherPlayers = this.onlinePlayers.filter(p => p.id !== gameData.playerData.profile.id);
+        // Other players in the room
+        const otherRoomPlayers = this.roomPlayers.filter(p => p.id !== gameData.playerData.profile.id);
         
-        console.log('Debug: All online players:', this.onlinePlayers);
-        console.log('Debug: My player ID:', gameData.playerData.profile.id);
-        console.log('Debug: Other players:', otherPlayers);
-        
-        if (otherPlayers.length === 0) {
-            this.sceneManager.drawText('No other players online', panelX + 10 * viewScale, panelY + 50 * viewScale, {
+        if (otherRoomPlayers.length === 0) {
+            this.sceneManager.drawText('No other players in this room', panelX + 10 * viewScale, panelY + 50 * viewScale, {
                 fontSize: 10 * viewScale,
                 color: 'rgb(128, 128, 128)'
             });
-            
-            // Show debug info
-            this.sceneManager.drawText(`Total players: ${this.onlinePlayers.length}`, panelX + 10 * viewScale, panelY + 65 * viewScale, {
-                fontSize: 9 * viewScale,
-                color: 'rgb(128, 128, 128)'
-            });
         } else {
-            otherPlayers.forEach((player, index) => {
-                const yPos = panelY + 50 * viewScale + (index * 20 * viewScale);
-                
-                // Player name
-                this.sceneManager.drawText(player.name, panelX + 10 * viewScale, yPos, {
-                    fontSize: 11 * viewScale,
-                    color: 'rgb(0, 0, 0)'
-                });
-                
-                // Challenge button
-                const buttonX = panelX + 120 * viewScale;
-                const buttonY = yPos - 2 * viewScale;
-                const buttonWidth = 70 * viewScale;
-                const buttonHeight = 16 * viewScale;
-                
-                this.sceneManager.drawButton(
-                    'Challenge',
-                    buttonX,
-                    buttonY,
-                    buttonWidth,
-                    buttonHeight,
-                    { 
-                        backgroundColor: '#10b981', 
-                        borderColor: '#059669',
-                        fontSize: 9
-                    }
-                );
-                
-                // Add button to clickable buttons list
-                if (!this.playerButtons) this.playerButtons = [];
-                this.playerButtons[index] = {
-                    x: buttonX,
-                    y: buttonY,
-                    width: buttonWidth,
-                    height: buttonHeight,
-                    onClick: () => this.challengePlayer(player.id, player.name)
-                };
+            let yOffset = 50;
+            otherRoomPlayers.forEach((player, index) => {
+                if (yOffset < panelHeight - 30) {
+                    // Player name
+                    this.sceneManager.drawText(player.name, panelX + 10 * viewScale, panelY + yOffset * viewScale, {
+                        fontSize: 10 * viewScale
+                    });
+                    
+                    // Challenge button
+                    const challengeButtonX = panelX + 120 * viewScale;
+                    const challengeButtonY = panelY + (yOffset - 5) * viewScale;
+                    const challengeButtonW = 60 * viewScale;
+                    const challengeButtonH = 18 * viewScale;
+                    
+                    this.sceneManager.drawButton(
+                        'Challenge',
+                        challengeButtonX,
+                        challengeButtonY,
+                        challengeButtonW,
+                        challengeButtonH,
+                        { 
+                            backgroundColor: '#f59e0b',
+                            borderColor: '#d97706',
+                            fontSize: 8 * viewScale
+                        }
+                    );
+                    
+                    // Store button for click detection
+                    if (!this.challengeButtons) this.challengeButtons = [];
+                    this.challengeButtons[index] = {
+                        x: challengeButtonX,
+                        y: challengeButtonY,
+                        width: challengeButtonW,
+                        height: challengeButtonH,
+                        playerId: player.id,
+                        playerName: player.name,
+                        onClick: () => this.challengePlayer(player.id, player.name)
+                    };
+                    
+                    yOffset += 20;
+                }
             });
-        }
-        
-        // Close button
-        const closeX = panelX + panelWidth - 20 * viewScale;
-        const closeY = panelY + 5 * viewScale;
-        this.sceneManager.drawText('✕', closeX, closeY, {
-            fontSize: 14 * viewScale,
-            color: 'rgb(200, 0, 0)'
-        });
-        
-        // Add close button to clickable area
-        if (!this.closeButton) {
-            this.closeButton = {
-                x: closeX - 5 * viewScale,
-                y: closeY - 5 * viewScale,
-                width: 15 * viewScale,
-                height: 15 * viewScale,
-                onClick: () => { this.showPlayersList = false; }
-            };
         }
     }
+
+    drawPermanentChat() {
+        // Chat area coordinates - using the right panel space
+        const panelX = 428 * viewScale;
+        const panelY = 165 * viewScale;
+        const panelWidth = 127 * viewScale;
+        const panelHeight = 214 * viewScale;
+        
+        // Chat header with debug info
+        this.sceneManager.drawText(`${this.selectedRoom} Chat`, panelX + 5 * viewScale, panelY + 15 * viewScale, {
+            fontSize: 10 * viewScale,
+            fontWeight: 'bold',
+            color: gameData.connected ? 'rgb(0, 120, 0)' : 'rgb(128, 128, 128)'
+        });
+        
+        if (!gameData.connected) {
+            this.sceneManager.drawText('Server Offline', panelX + 5 * viewScale, panelY + 35 * viewScale, {
+                fontSize: 9 * viewScale,
+                color: 'rgb(200, 0, 0)'
+            });
+            return;
+        }
+        
+        // Chat messages area
+        let yOffset = 35; // Adjusted for debug line
+        const maxMessages = 11; // Reduced by 1 for debug line
+        const startIndex = Math.max(0, chatMessages.length - maxMessages);
+        
+        for (let i = startIndex; i < chatMessages.length; i++) {
+            const msg = chatMessages[i];
+            if (yOffset < panelHeight - 35) {
+                // Player name and message
+                const isOwnMessage = msg.playerId === gameData.playerData.profile.id;
+                const nameColor = isOwnMessage ? 'rgb(0, 120, 0)' : 'rgb(0, 0, 120)';
+                
+                this.sceneManager.drawText(`${msg.playerName}:`, panelX + 5 * viewScale, panelY + yOffset * viewScale, {
+                    fontSize: 8 * viewScale,
+                    fontWeight: 'bold',
+                    color: nameColor
+                });
+                
+                // Wrap message text to fit panel width
+                const maxChars = 18; // Adjusted for narrower panel
+                const wrappedMessage = msg.message.length > maxChars ? 
+                    msg.message.substring(0, maxChars) + '...' : msg.message;
+                
+                this.sceneManager.drawText(wrappedMessage, panelX + 5 * viewScale, panelY + (yOffset + 8) * viewScale, {
+                    fontSize: 7 * viewScale,
+                    color: 'rgb(50, 50, 50)'
+                });
+                
+                yOffset += 15; // Tighter spacing
+            }
+        }
+        
+        if (chatMessages.length === 0) {
+            this.sceneManager.drawText('No messages yet...', panelX + 5 * viewScale, panelY + 45 * viewScale, {
+                fontSize: 8 * viewScale,
+                color: 'rgb(128, 128, 128)'
+            });
+        }
+        
+        // Chat input area - at bottom of panel
+        const inputY = panelY + panelHeight - 25 * viewScale;
+        const inputWidth = panelWidth - 35 * viewScale;
+        
+        this.sceneManager.drawPanel(
+            panelX + 3 * viewScale,
+            inputY,
+            inputWidth,
+            15 * viewScale,
+            { backgroundColor: 'white', borderRadius: 3 }
+        );
+        
+        // Input text with cursor
+        const displayText = this.chatInput + (Date.now() % 1000 < 500 ? '|' : '');
+        this.sceneManager.drawText(displayText, panelX + 5 * viewScale, inputY + 10 * viewScale, {
+            fontSize: 7 * viewScale
+        });
+        
+        // Send button
+        this.sceneManager.drawButton(
+            'Send',
+            panelX + panelWidth - 28 * viewScale,
+            inputY,
+            25 * viewScale,
+            15 * viewScale,
+            { 
+                backgroundColor: '#3b82f6',
+                borderColor: '#2563eb',
+                fontSize: 6 * viewScale
+            }
+        );
+        
+        // Store send button for click detection
+        this.sendChatButton = {
+            x: panelX + panelWidth - 28 * viewScale,
+            y: inputY,
+            width: 25 * viewScale,
+            height: 15 * viewScale,
+            onClick: () => this.sendChatMessage()
+        };
+        
+        // Store chat input area for click detection
+        this.chatInputArea = {
+            x: panelX + 3 * viewScale,
+            y: inputY,
+            width: inputWidth,
+            height: 15 * viewScale,
+            onClick: () => {
+                // Chat input focused
+            }
+        };
+    }
+    
+    sendChatMessage() {
+        if (this.chatInput.trim() && gameData.connected) {
+            gameData.sendRoomChatMessage(this.chatInput.trim());
+            this.chatInput = '';
+        }
+    }
+    
+
 
     // Override handleClick to handle players list interactions
     handleClick(x, y) {
@@ -982,20 +1191,29 @@ class Lobby extends Scene {
         
         // Check players list buttons
         if (this.showPlayersList) {
-            // Check close button
-            if (this.closeButton && this.isPointInButton(x, y, this.closeButton)) {
-                this.closeButton.onClick();
-                return;
-            }
-            
-            // Check player challenge buttons
-            if (this.playerButtons) {
-                for (let button of this.playerButtons) {
+            // Check challenge buttons
+            if (this.challengeButtons) {
+                for (let button of this.challengeButtons) {
                     if (button && this.isPointInButton(x, y, button)) {
                         button.onClick();
                         return;
                     }
                 }
+            }
+        }
+        
+        // Check permanent chat buttons (always available when connected)
+        if (gameData.connected) {
+            // Check send chat button
+            if (this.sendChatButton && this.isPointInButton(x, y, this.sendChatButton)) {
+                this.sendChatButton.onClick();
+                return;
+            }
+            
+            // Check chat input area
+            if (this.chatInputArea && this.isPointInButton(x, y, this.chatInputArea)) {
+                this.chatInputArea.onClick();
+                return;
             }
         }
         
@@ -1084,11 +1302,16 @@ class Lobby extends Scene {
 
     // Update room player counts (called when server data is received)
     updateRoomPlayerCounts(roomData) {
-        if (roomData && Array.isArray(roomData)) {
-            roomData.forEach(serverRoom => {
-                const localRoom = this.rooms.find(room => room.name === serverRoom.name);
-                if (localRoom) {
-                    localRoom.players = serverRoom.players;
+        // Updating room player counts
+        if (roomData && typeof roomData === 'object') {
+            // roomData is an object like { "Battlegrounds": 2, "Jungle": 1 }
+            this.rooms.forEach(room => {
+                if (roomData.hasOwnProperty(room.name)) {
+                    room.players = roomData[room.name];
+                    // Room player count updated
+                } else {
+                    // Room not in server data means 0 players
+                    room.players = 0;
                 }
             });
         }

@@ -33,10 +33,14 @@ class SceneManager {
     }
 
     startRenderLoop() {
-        const render = () => {
+        let lastTime = 0;
+        const render = (currentTime) => {
+            const deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+            
             // Update game logic
             if (this.currentScene && this.currentScene.update) {
-                this.currentScene.update();
+                this.currentScene.update(deltaTime);
             }
             
             // Clear canvas
@@ -44,16 +48,21 @@ class SceneManager {
             
             // Draw current scene if it exists
             if (this.currentScene && this.currentScene.render) {
-                this.currentScene.render(this.ctx);
+                this.currentScene.render(this.ctx, this.canvas, viewScale);
             }
             
             requestAnimationFrame(render);
         };
-        render();
+        render(0);
     }
 
     registerScene(name, sceneClass) {
         this.scenes[name] = sceneClass;
+    }
+
+    switchTo(sceneName, data = {}) {
+        // Alias for startScene for backwards compatibility
+        this.startScene(sceneName, data);
     }
 
     startScene(name, data = {}) {
@@ -61,11 +70,21 @@ class SceneManager {
         if (this.currentScene && this.currentScene.destroy) {
             this.currentScene.destroy();
         }
+        
+        // Call onExit if it exists
+        if (this.currentScene && this.currentScene.onExit) {
+            this.currentScene.onExit();
+        }
 
         // Start new scene
         if (this.scenes[name]) {
             this.currentScene = new this.scenes[name](this, data);
-            this.currentScene.create();
+            if (this.currentScene.create) {
+                this.currentScene.create();
+            }
+            if (this.currentScene.onEnter) {
+                this.currentScene.onEnter();
+            }
         }
     }
 
@@ -351,13 +370,44 @@ class SceneManager {
 
     // Add click handling for canvas
     setupClickHandling() {
+        // Mouse click events
         this.canvas.addEventListener('click', (event) => {
             const rect = this.canvas.getBoundingClientRect();
             const x = event.clientX - rect.left;
             const y = event.clientY - rect.top;
+            const viewScale = Math.min(this.canvas.width / 600, this.canvas.height / 400);
             
             if (this.currentScene && this.currentScene.handleClick) {
                 this.currentScene.handleClick(x, y);
+            }
+            
+            // Also handle mouseDown for LocalGame compatibilitybackground
+            if (this.currentScene && this.currentScene.handleMouseDown) {
+                this.currentScene.handleMouseDown(x, y, this.canvas, viewScale);
+            }
+        });
+
+        // Mouse down events
+        this.canvas.addEventListener('mousedown', (event) => {
+            const rect = this.canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            const viewScale = Math.min(this.canvas.width / 600, this.canvas.height / 400);
+            
+            if (this.currentScene && this.currentScene.handleMouseDown) {
+                this.currentScene.handleMouseDown(x, y, this.canvas, viewScale);
+            }
+        });
+
+        // Mouse up events  
+        this.canvas.addEventListener('mouseup', (event) => {
+            const rect = this.canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            const viewScale = Math.min(this.canvas.width / 600, this.canvas.height / 400);
+            
+            if (this.currentScene && this.currentScene.handleMouseUp) {
+                this.currentScene.handleMouseUp(x, y, this.canvas, viewScale);
             }
         });
 
@@ -380,7 +430,20 @@ class SceneManager {
             const y = event.clientY - rect.top;
             
             if (this.currentScene && this.currentScene.handleMouseMove) {
-                this.currentScene.handleMouseMove(x, y);
+                this.currentScene.handleMouseMove(x, y, this.canvas, viewScale);
+            }
+        });
+
+        // Add keyboard event handling
+        document.addEventListener('keydown', (event) => {
+            if (this.currentScene && this.currentScene.handleKeyDown) {
+                this.currentScene.handleKeyDown(event.key);
+            }
+        });
+
+        document.addEventListener('keyup', (event) => {
+            if (this.currentScene && this.currentScene.handleKeyUp) {
+                this.currentScene.handleKeyUp(event.key);
             }
         });
     }
@@ -430,4 +493,6 @@ class Scene {
 }
 
 // Initialize the game
+// Global instances
 const gameManager = new SceneManager();
+const sceneManager = gameManager; // Alias for compatibility

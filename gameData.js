@@ -7,7 +7,7 @@ class GameData {
         
         // Server configuration - automatically detects the right URL
         this.SERVER_URL = this.getServerURL();
-        console.log('🎯 Detected server URL:', this.SERVER_URL);
+        // Auto-detected server URL
         
         this.playerData = {
             profile: {
@@ -26,6 +26,13 @@ class GameData {
             inGame: false,
             gameMode: null, // 'local', 'practice', 'online'
             opponent: null
+        };
+        
+        // Room-specific data
+        this.roomData = {
+            currentRoom: null,
+            roomPlayers: [],
+            chatMessages: []
         };
         
         // WebSocket connection (for online mode)
@@ -47,13 +54,13 @@ class GameData {
         
         // If we're on localhost, use the standard port
         if (host.includes('localhost') || host.includes('127.0.0.1')) {
-            console.log('🏠 Using localhost WebSocket');
+            // Using localhost WebSocket
             return 'ws://localhost:8080';
         }
         
         // For deployed versions, use the same host
         const wsUrl = `${protocol}//${host}`;
-        console.log('🌐 Using deployed WebSocket:', wsUrl);
+        // Using deployed WebSocket
         return wsUrl;
     }
     
@@ -84,7 +91,7 @@ class GameData {
     // === ONLINE CONNECTION ===
     async connectToServer(serverUrl = null) {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-            console.log('🔗 Already connected to server');
+            // Already connected
             return; // Already connected
         }
         
@@ -92,7 +99,7 @@ class GameData {
         const wsUrl = serverUrl || this.SERVER_URL;
         
         try {
-            console.log('🔌 Attempting to connect to server:', wsUrl);
+            // Attempting to connect to server
             this.socket = new WebSocket(wsUrl);
             
             this.socket.onopen = () => {
@@ -171,8 +178,20 @@ class GameData {
                 this.handlePlayersList(message.players);
                 break;
                 
-            case 'roomsUpdate':
+            case 'roomsData':
                 this.handleRoomsUpdate(message.rooms);
+                break;
+                
+            case 'roomJoined':
+                this.handleRoomJoined(message);
+                break;
+                
+            case 'roomPlayers':
+                this.handleRoomPlayers(message);
+                break;
+                
+            case 'roomChatMessage':
+                this.handleRoomChatMessage(message);
                 break;
                 
             case 'gameInvite':
@@ -275,22 +294,22 @@ class GameData {
             accepted: accept
         });
         
-        console.log(`Game invite from ${message.fromPlayer} - ${accept ? 'Accepted' : 'Declined'}`);
+        // Game invite response
     }
     
     handleInviteSent(message) {
-        console.log(`Invitation sent to ${message.targetPlayer}`);
+        // Invitation sent
         // You could show a toast notification here
         alert(`Challenge sent to ${message.targetPlayer}!\nWaiting for their response...`);
     }
     
     handleInviteAccepted(message) {
-        console.log(`Invitation accepted by ${message.playerName}`);
+        // Invitation accepted
         alert(`${message.playerName} accepted your challenge!\nStarting game...`);
     }
     
     handleInviteDeclined(message) {
-        console.log(`Invitation declined by ${message.playerName}`);
+        // Invitation declined
         alert(`${message.playerName} declined your challenge.`);
     }
     
@@ -300,7 +319,7 @@ class GameData {
         this.gameState.opponent = message.opponent;
         this.gameState.gameId = message.gameId;
         
-        console.log('Game starting with opponent:', message.opponent);
+        // Game starting
         
         // Notify the scene manager to switch to game scene
         if (this.gameStartCallback) {
@@ -315,7 +334,7 @@ class GameData {
     
     handleOpponentMove(message) {
         // Handle opponent's move in the game
-        console.log('Opponent move:', message.move);
+        // Opponent move received
     }
     
     handleGameEnd(message) {
@@ -323,7 +342,7 @@ class GameData {
     }
     
     handlePlayersList(players) {
-        console.log('Received players list from server:', players);
+        // Players list received
         // Notify lobby scene about updated players list
         if (this.playersListCallback) {
             this.playersListCallback(players);
@@ -331,7 +350,7 @@ class GameData {
     }
     
     handleRoomsUpdate(rooms) {
-        console.log('Received rooms data from server:', rooms);
+        // Rooms data received
         // Notify lobby scene about updated room data
         if (this.roomsUpdateCallback) {
             this.roomsUpdateCallback(rooms);
@@ -350,7 +369,7 @@ class GameData {
     
     // Request current players list from server
     requestPlayersList() {
-        console.log('Requesting players list from server...');
+        // Requesting players list
         if (this.connected) {
             this.sendToServer({
                 type: 'requestPlayersList'
@@ -360,12 +379,110 @@ class GameData {
     
     // Request current room data from server
     requestRoomsData() {
-        console.log('Requesting rooms data from server...');
+        // Requesting rooms data
         if (this.connected) {
             this.sendToServer({
                 type: 'requestRoomsData'
             });
         }
+    }
+    
+    // Join a specific room
+    joinRoom(roomName) {
+        // Joining room
+        if (this.connected) {
+            this.sendToServer({
+                type: 'joinRoom',
+                roomName: roomName
+            });
+        }
+    }
+    
+    handleRoomJoined(message) {
+        // Successfully joined room
+        
+        // Update current room data
+        this.roomData.currentRoom = message.roomName;
+        this.roomData.chatMessages = []; // Clear chat when changing rooms
+        
+        // Request players in the new room
+        this.requestRoomPlayers(message.roomName);
+        
+        // Notify lobby scene about successful room join
+        if (this.roomJoinedCallback) {
+            this.roomJoinedCallback(message.roomName);
+        }
+    }
+    
+    // Method for lobby to subscribe to room join confirmations
+    onRoomJoined(callback) {
+        this.roomJoinedCallback = callback;
+    }
+    
+    // === ROOM-BASED FEATURES ===
+    
+    // Request players in a specific room
+    requestRoomPlayers(roomName) {
+        // Requesting players in room
+        if (this.connected) {
+            this.sendToServer({
+                type: 'requestRoomPlayers',
+                roomName: roomName
+            });
+        }
+    }
+    
+    // Send a chat message to the current room
+    sendRoomChatMessage(text) {
+        if (this.connected && this.roomData.currentRoom && text.trim()) {
+            this.sendToServer({
+                type: 'roomChatMessage',
+                text: text.trim()
+            });
+        }
+    }
+    
+    // Handle room players list update
+    handleRoomPlayers(message) {
+        // Received room players
+        this.roomData.roomPlayers = message.players;
+        
+        // Notify lobby about updated room players
+        if (this.roomPlayersCallback) {
+            this.roomPlayersCallback(message.roomName, message.players);
+        }
+    }
+    
+    // Handle incoming room chat message
+    handleRoomChatMessage(message) {
+        // Room chat message received
+        
+        // Add to chat history
+        this.roomData.chatMessages.push({
+            playerId: message.playerId,
+            playerName: message.playerName,
+            message: message.message,
+            timestamp: message.timestamp
+        });
+        
+        // Keep only last 50 messages
+        if (this.roomData.chatMessages.length > 50) {
+            this.roomData.chatMessages = this.roomData.chatMessages.slice(-50);
+        }
+        
+        // Notify lobby about new chat message
+        if (this.roomChatCallback) {
+            this.roomChatCallback(message);
+        }
+    }
+    
+    // Callback subscriptions for room features
+    onRoomPlayersUpdate(callback) {
+        this.roomPlayersCallback = callback;
+    }
+    
+    onRoomChatMessage(callback) {
+        this.roomChatCallback = callback;
     }
 
     // === OBSERVER PATTERN ===

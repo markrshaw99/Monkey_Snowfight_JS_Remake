@@ -2,7 +2,7 @@
 class OnlineMultiplayer extends Scene {
     async create() {
         // Load background image
-        await this.sceneManager.loadImage('images/Background.svg');
+        await this.sceneManager.loadImage('images/Background2.svg');
         
         // Set up back button for click handling
         this.setupButtons();
@@ -23,7 +23,7 @@ class OnlineMultiplayer extends Scene {
 
     render(ctx) {
         // Draw background
-        this.sceneManager.drawBackground('images/Background.svg');
+        this.sceneManager.drawBackground('images/Background2.svg');
         
         // Draw title
         this.sceneManager.drawText(
